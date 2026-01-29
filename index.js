@@ -362,7 +362,49 @@ app.get('/update-db-v4', async (req, res) => {
     }
 });
 
+// --- GESTION PROJETS (MODIFICATION) ---
+app.put('/projects/:id', async (req, res) => {
+    const { id } = req.params;
+    const { name, description } = req.body;
+    try {
+        const update = await pool.query(
+            "UPDATE projects SET name = COALESCE($1, name), description = COALESCE($2, description) WHERE id = $3 RETURNING *",
+            [name, description, id]
+        );
+        res.json(update.rows[0]);
+    } catch (err) { res.status(500).send("Erreur modif projet"); }
+});
 
+// --- GESTION SOUS-TÂCHES ---
+// 1. Lister
+app.get('/tasks/:id/subtasks', async (req, res) => {
+    const subtasks = await pool.query("SELECT * FROM subtasks WHERE task_id = $1 ORDER BY id", [req.params.id]);
+    res.json(subtasks.rows);
+});
+
+// 2. Créer
+app.post('/subtasks', async (req, res) => {
+    const { task_id, title } = req.body;
+    const newSub = await pool.query("INSERT INTO subtasks (task_id, title) VALUES ($1, $2) RETURNING *", [task_id, title]);
+    res.json(newSub.rows[0]);
+});
+
+// 3. Modifier (Renommer ou Cocher)
+app.put('/subtasks/:id', async (req, res) => {
+    const { id } = req.params;
+    const { title, is_completed } = req.body;
+    const update = await pool.query(
+        "UPDATE subtasks SET title = COALESCE($1, title), is_completed = COALESCE($2, is_completed) WHERE id = $3 RETURNING *",
+        [title, is_completed, id]
+    );
+    res.json(update.rows[0]);
+});
+
+// 4. Supprimer
+app.delete('/subtasks/:id', async (req, res) => {
+    await pool.query("DELETE FROM subtasks WHERE id = $1", [req.params.id]);
+    res.json({ message: "Supprimé" });
+});
 
 
 app.listen(PORT, () => {
