@@ -343,6 +343,24 @@ app.get('/sites/:siteId/projects', async (req, res) => {
     res.json(projects.rows);
 });
 
+// --- ROUTE MAJ V4 (SOUS-TÂCHES) ---
+app.get('/update-db-v4', async (req, res) => {
+    try {
+        // 1. Table SOUS-TÂCHES
+        await pool.query(`
+            CREATE TABLE IF NOT EXISTS subtasks (
+                id SERIAL PRIMARY KEY,
+                task_id INT REFERENCES tasks(id) ON DELETE CASCADE,
+                title VARCHAR(255) NOT NULL,
+                is_completed BOOLEAN DEFAULT FALSE,
+                created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP
+            )
+        `);
+        res.send("Module Sous-Tâches installé !");
+    } catch (err) {
+        res.status(500).send("Erreur V4: " + err.message);
+    }
+});
 
 
 
