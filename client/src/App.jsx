@@ -145,4 +145,7 @@ function TaskModal({ task, projectMembers, onClose, onUpdate }) {
         </div>
 
         <div style={{display:'flex', justifyContent:'flex-end', gap:'10px', marginTop:'auto', paddingTop:'20px', borderTop:'1px solid #e2e8f0'}}>
-            <button onClick={onClose} style={{padding:'10px 20px', cursor:'pointer', border:'1px solid #cbd5e1
+            <button onClick={onClose} style={{padding:'10px 20px', cursor:'pointer', border:'1px solid #cbd5e1', background:'white', borderRadius:'5px', fontWeight:'600', color:'#475569'}}>Annuler</button>
+            <button onClick={handleSaveMain} style={{padding:'10px 20px', background:'#3b82f6', color:'white', border:'none', borderRadius:'5px', cursor:'pointer', fontWeight:'600'}}>Enregistrer les modifications</button>
+        </div>
+        
