@@ -250,6 +250,101 @@ app.put('/tasks/:id', async (req, res) => {
     }
 });
 
+// --- ROUTE DE MISE À JOUR V3 (ENTERPRISE) ---
+app.get('/update-db-v3', async (req, res) => {
+    try {
+        // 1. Créer la table SITES
+        await pool.query(`
+            CREATE TABLE IF NOT EXISTS sites (
+                id SERIAL PRIMARY KEY,
+                name VARCHAR(100) NOT NULL,
+                owner_id INT REFERENCES users(id),
+                created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP
+            )
+        `);
+
+        // 2. Lier PROJETS aux SITES
+        await pool.query("ALTER TABLE projects ADD COLUMN IF NOT EXISTS site_id INT REFERENCES sites(id) ON DELETE CASCADE");
+
+        // 3. Créer un Site par défaut pour ne pas perdre les vieux projets
+        const defaultSite = await pool.query("INSERT INTO sites (name, owner_id) VALUES ('Site Principal', 1) ON CONFLICT DO NOTHING RETURNING id");
+        // Si des projets n'ont pas de site, on les met dans le site par défaut (ID 1 probablement)
+        await pool.query("UPDATE projects SET site_id = 1 WHERE site_id IS NULL");
+
+        // 4. Table de liaison PROJET <-> MEMBRES (Qui a le droit de voir quoi ?)
+        await pool.query(`
+            CREATE TABLE IF NOT EXISTS project_members (
+                project_id INT REFERENCES projects(id) ON DELETE CASCADE,
+                user_id INT REFERENCES users(id) ON DELETE CASCADE,
+                role VARCHAR(20) DEFAULT 'member',
+                PRIMARY KEY (project_id, user_id)
+            )
+        `);
+
+        // 5. Lier TÂCHES aux UTILISATEURS (Assignation)
+        await pool.query("ALTER TABLE tasks ADD COLUMN IF NOT EXISTS assignee_id INT REFERENCES users(id)");
+
+        res.send("Architecture Multi-Sites & Équipes déployée avec succès !");
+    } catch (err) {
+        res.status(500).send("Erreur V3: " + err.message);
+    }
+});
+
+
+// --- GESTION DES SITES ---
+app.get('/sites', async (req, res) => {
+    // Dans la vraie vie, on filtrerait par user_id, ici on simplifie
+    const sites = await pool.query("SELECT * FROM sites ORDER BY id");
+    res.json(sites.rows);
+});
+
+app.post('/sites', async (req, res) => {
+    const { name, owner_id } = req.body;
+    const newSite = await pool.query("INSERT INTO sites (name, owner_id) VALUES ($1, $2) RETURNING *", [name, owner_id]);
+    res.json(newSite.rows[0]);
+});
+
+// --- GESTION DES MEMBRES D'UN PROJET ---
+// 1. Récupérer les membres
+app.get('/projects/:id/members', async (req, res) => {
+    const { id } = req.params;
+    const members = await pool.query(
+        "SELECT u.id, u.username, u.email FROM users u JOIN project_members pm ON u.id = pm.user_id WHERE pm.project_id = $1", 
+        [id]
+    );
+    res.json(members.rows);
+});
+
+// 2. Ajouter un membre par email
+app.post('/projects/:id/invite', async (req, res) => {
+    const { id } = req.params; // ID du projet
+    const { email } = req.body;
+
+    try {
+        // Trouver l'utilisateur
+        const userCheck = await pool.query("SELECT id FROM users WHERE email = $1", [email]);
+        if (userCheck.rows.length === 0) return res.status(404).json("Cet utilisateur n'est pas encore inscrit sur l'application.");
+        
+        const userId = userCheck.rows[0].id;
+
+        // L'ajouter au projet
+        await pool.query("INSERT INTO project_members (project_id, user_id) VALUES ($1, $2) ON CONFLICT DO NOTHING", [id, userId]);
+        
+        res.json({ success: true, message: "Membre ajouté !" });
+    } catch (err) {
+        res.status(500).json("Erreur lors de l'invitation");
+    }
+});
+
+// --- MODIFICATION : Récupérer les projets D'UN SITE spécifique ---
+app.get('/sites/:siteId/projects', async (req, res) => {
+    const { siteId } = req.params;
+    const projects = await pool.query("SELECT * FROM projects WHERE site_id = $1 ORDER BY id DESC", [siteId]);
+    res.json(projects.rows);
+});
+
+
+
 
 
 app.listen(PORT, () => {
