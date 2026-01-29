@@ -194,6 +194,21 @@ app.get('/setup-db', async (req, res) => {
     }
 });
 
+// Route pour CRÉER un projet
+app.post('/projects', async (req, res) => {
+    try {
+        const { name, description, owner_id } = req.body;
+        const newProject = await pool.query(
+            "INSERT INTO projects (name, description, owner_id) VALUES ($1, $2, $3) RETURNING *",
+            [name, description, owner_id]
+        );
+        res.json(newProject.rows[0]);
+    } catch (err) {
+        console.error(err.message);
+        res.status(500).send("Erreur lors de la création du projet");
+    }
+});
+
 
 
 
