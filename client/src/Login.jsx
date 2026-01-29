@@ -4,20 +4,24 @@ import { useState } from 'react';
 export default function Login({ onLogin }) {
   const [email, setEmail] = useState('');
   const [password, setPassword] = useState('');
-  const [isRegistering, setIsRegistering] = useState(false); // Basculer entre Login et Inscription
-  const [username, setUsername] = useState(''); // Pour l'inscription
+  const [isRegistering, setIsRegistering] = useState(false); 
+  const [username, setUsername] = useState(''); 
   const [error, setError] = useState('');
 
   const handleSubmit = async (e) => {
     e.preventDefault();
     setError('');
 
-    // On choisit la route (Login ou Register)
-    // NOTE : Changez l'URL ici par votre URL Render si vous testez en ligne, ou localhost en local
-    // Pour l'instant, on laisse localhost pour tester sur votre PC
+    // --- CORRECTION ICI ---
+    // 1. On définit l'adresse de base du CERVEAU (API), pas du site web.
+    // REMPLACEZ L'ADRESSE CI-DESSOUS PAR CELLE DE VOTRE SERVICE "medina-api" SUR RENDER
+    const apiBase = 'https://medina-api.onrender.com'; 
+
+    // 2. On ajoute le bon chemin (/auth/register ou /auth/login)
     const endpoint = isRegistering 
-        ? 'https://medina-app.onrender.com' 
-        : 'https://medina-app.onrender.com';
+        ? `${apiBase}/auth/register` 
+        : `${apiBase}/auth/login`;
+    // ---------------------
 
     const body = isRegistering 
         ? { username, email, password } 
@@ -30,22 +34,24 @@ export default function Login({ onLogin }) {
         body: JSON.stringify(body)
       });
 
+      // Attention : Si le serveur renvoie une erreur (ex: mot de passe faux), 
+      // il faut pouvoir lire le message même si ce n'est pas du JSON parfait parfois.
       const data = await response.json();
 
       if (response.ok) {
-        // Si c'est un login réussi
         if (!isRegistering) {
             onLogin(data.token, data.user);
         } else {
-            // Si l'inscription a marché, on bascule vers le login
             setIsRegistering(false);
             setError("Compte créé ! Connectez-vous maintenant.");
         }
       } else {
-        setError(data);
+        // Affiche l'erreur renvoyée par le serveur (ex: "Mot de passe incorrect")
+        setError(typeof data === 'string' ? data : "Erreur d'identification");
       }
     } catch (err) {
-      setError("Erreur de connexion au serveur");
+      console.error(err);
+      setError("Erreur de connexion au serveur (Vérifiez l'URL API)");
     }
   };
 
