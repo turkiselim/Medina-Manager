@@ -7,12 +7,14 @@ const app = express();
 const PORT = 5000;
 
 // Configuration de la connexion
+const connectionString = process.env.DATABASE_URL 
+  ? process.env.DATABASE_URL  // Si on est sur le Cloud (Render)
+  : `postgresql://${process.env.DB_USER}:${process.env.DB_PASSWORD}@${process.env.DB_HOST}:${process.env.DB_PORT}/${process.env.DB_NAME}`; // Si on est en local
+
 const pool = new Pool({
-    user: process.env.DB_USER,
-    password: process.env.DB_PASSWORD,
-    host: process.env.DB_HOST,
-    port: process.env.DB_PORT,
-    database: process.env.DB_NAME
+    connectionString,
+    // Cette ligne est obligatoire pour Render (SSL) mais doit être désactivée en local
+    ssl: process.env.DATABASE_URL ? { rejectUnauthorized: false } : false
 });
 
 app.use(cors());
