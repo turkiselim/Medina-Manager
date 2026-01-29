@@ -209,7 +209,21 @@ app.post('/projects', async (req, res) => {
     }
 });
 
-
+// --- ROUTE DE MISE À JOUR V2 (À SUPPRIMER APRÈS USAGE) ---
+app.get('/update-db-v2', async (req, res) => {
+    try {
+        // Ajout des colonnes pour la V2
+        await pool.query("ALTER TABLE tasks ADD COLUMN IF NOT EXISTS description TEXT");
+        await pool.query("ALTER TABLE tasks ADD COLUMN IF NOT EXISTS priority VARCHAR(20) DEFAULT 'medium'"); // low, medium, high
+        await pool.query("ALTER TABLE tasks ADD COLUMN IF NOT EXISTS due_date DATE");
+        await pool.query("ALTER TABLE tasks ADD COLUMN IF NOT EXISTS progress INT DEFAULT 0"); // 0 à 100%
+        await pool.query("ALTER TABLE tasks ADD COLUMN IF NOT EXISTS attachment_url TEXT"); // Lien vers photo/fichier
+        
+        res.send("Base de données mise à jour vers V2 !");
+    } catch (err) {
+        res.status(500).send("Erreur MAJ: " + err.message);
+    }
+});
 
 
 app.listen(PORT, () => {
