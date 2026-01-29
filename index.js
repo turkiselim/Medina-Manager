@@ -224,6 +224,32 @@ app.get('/update-db-v2', async (req, res) => {
         res.status(500).send("Erreur MAJ: " + err.message);
     }
 });
+// Route pour MODIFIER une tâche (PUT)
+app.put('/tasks/:id', async (req, res) => {
+    try {
+        const { id } = req.params;
+        const { title, description, status, priority, progress, due_date, attachment_url } = req.body;
+        
+        // On met à jour tous les champs
+        const update = await pool.query(
+            `UPDATE tasks SET 
+             title = COALESCE($1, title),
+             description = COALESCE($2, description),
+             status = COALESCE($3, status),
+             priority = COALESCE($4, priority),
+             progress = COALESCE($5, progress),
+             due_date = COALESCE($6, due_date),
+             attachment_url = COALESCE($7, attachment_url)
+             WHERE id = $8 RETURNING *`,
+            [title, description, status, priority, progress, due_date, attachment_url, id]
+        );
+        res.json(update.rows[0]);
+    } catch (err) {
+        console.error(err);
+        res.status(500).send("Erreur mise à jour tâche");
+    }
+});
+
 
 
 app.listen(PORT, () => {
