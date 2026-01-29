@@ -9,14 +9,14 @@ function App() {
   const [newTaskTitle, setNewTaskTitle] = useState("")
 
   useEffect(() => {
-    fetch('http://localhost:5000/projects')
+    fetch('https://medina-api.onrender.com')
       .then(res => res.json())
       .then(data => setProjects(data))
   }, [])
 
   const openProject = (project) => {
     setSelectedProject(project);
-    fetch(`http://localhost:5000/tasks/${project.id}`)
+    fetch(`https://medina-api.onrender.com`)
       .then(res => res.json())
       .then(data => setTasks(data))
   }
@@ -27,7 +27,7 @@ function App() {
     if (newTaskTitle === "") return; // On ne crée pas de tâche vide
 
     try {
-      const response = await fetch('http://localhost:5000/tasks', {
+      const response = await fetch('https://medina-api.onrender.com', {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify({
