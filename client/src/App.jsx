@@ -191,12 +191,117 @@ function ProjectView({ project, tasks, members, viewMode, setViewMode, onAddTask
     )
 }
 
-// --- VUE MEMBRES ---
+// --- VUE MEMBRES (ANNUAIRE RH) ---
 function MembersView({ user }) {
     const [email, setEmail] = useState("");
     const [inviteLink, setInviteLink] = useState("");
-    const handleInvite = async (e) => { e.preventDefault(); const res = await fetch(`${API_URL}/admin/invite`, { method:'POST', headers:{'Content-Type':'application/json'}, body:JSON.stringify({email}) }); const json = await res.json(); setInviteLink(json.link.replace('http://localhost:5000', 'https://medina-app.onrender.com')); };
-    return (<div style={{padding:'40px'}}><h1>Membres</h1><div style={{background:'white', padding:'30px', maxWidth:'500px'}}><form onSubmit={handleInvite}><input type="email" value={email} onChange={e=>setEmail(e.target.value)} placeholder="Email" style={{padding:'10px', width:'100%', marginBottom:'10px'}} /><button type="submit" style={{width:'100%', padding:'10px', background:'#10b981', color:'white', border:'none'}}>Générer Lien</button></form>{inviteLink && <input readOnly value={inviteLink} style={{width:'100%', marginTop:'10px', padding:'10px'}} />}</div></div>);
+    const [members, setMembers] = useState([]);
+
+    // Charger la liste des membres
+    const loadMembers = () => {
+        fetch(`${API_URL}/users`).then(r => r.json()).then(setMembers).catch(console.error);
+    };
+
+    useEffect(() => { loadMembers(); }, []);
+
+    const handleInvite = async (e) => {
+        e.preventDefault();
+        const res = await fetch(`${API_URL}/admin/invite`, { method: 'POST', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify({ email }) });
+        const json = await res.json();
+        setInviteLink(json.link.replace('http://localhost:5000', 'https://medina-app.onrender.com'));
+    };
+
+    const changeRole = async (userId, newRole) => {
+        if (userId === user.id) { alert("Vous ne pouvez pas modifier vos propres droits ici."); return; }
+        const res = await fetch(`${API_URL}/users/${userId}/role`, { method: 'PUT', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify({ role: newRole }) });
+        if (res.ok) {
+            alert("Droits mis à jour !");
+            loadMembers(); // Rafraîchir la liste
+        }
+    };
+
+    const removeUser = async (userId) => {
+        if (!confirm("Voulez-vous vraiment retirer cet utilisateur de l'hôtel ?")) return;
+        await fetch(`${API_URL}/users/${userId}`, { method: 'DELETE' });
+        loadMembers();
+    };
+
+    return (
+        <div style={{ padding: '40px', maxWidth: '1000px', margin: '0 auto' }}>
+            <h1 style={{ marginBottom: '30px' }}>Gestion des Ressources Humaines</h1>
+
+            <div style={{ display: 'grid', gridTemplateColumns: '1fr 2fr', gap: '30px' }}>
+                
+                {/* BLOC 1 : INVITER */}
+                <div style={{ background: 'white', padding: '25px', borderRadius: '10px', border: '1px solid #eee', height: 'fit-content' }}>
+                    <h3 style={{ marginTop: 0 }}>📩 Inviter un collaborateur</h3>
+                    <p style={{ fontSize: '13px', color: '#666' }}>Générez un lien unique pour permettre à un employé de créer son compte.</p>
+                    <form onSubmit={handleInvite} style={{ display: 'flex', gap: '10px', flexDirection: 'column', marginTop: '15px' }}>
+                        <input type="email" value={email} onChange={e => setEmail(e.target.value)} placeholder="email@medina.tn" style={{ padding: '10px', border: '1px solid #ccc', borderRadius: '6px' }} required />
+                        <button type="submit" style={{ padding: '10px', background: '#3b82f6', color: 'white', border: 'none', borderRadius: '6px', cursor: 'pointer', fontWeight: 'bold' }}>Générer le lien</button>
+                    </form>
+                    {inviteLink && <div style={{ marginTop: '15px', background: '#eff6ff', padding: '10px', borderRadius: '6px', border: '1px solid #bfdbfe', fontSize: '12px', wordBreak: 'break-all' }}><strong>Lien :</strong> {inviteLink}</div>}
+                </div>
+
+                {/* BLOC 2 : LISTE DU PERSONNEL */}
+                <div style={{ background: 'white', padding: '25px', borderRadius: '10px', border: '1px solid #eee' }}>
+                    <h3 style={{ marginTop: 0 }}>👥 L'Équipe ({members.length})</h3>
+                    <div style={{ overflowX: 'auto' }}>
+                        <table style={{ width: '100%', borderCollapse: 'collapse', marginTop: '15px' }}>
+                            <thead>
+                                <tr style={{ borderBottom: '2px solid #f3f4f6', textAlign: 'left' }}>
+                                    <th style={{ padding: '10px', fontSize: '12px', color: '#888', textTransform: 'uppercase' }}>Nom</th>
+                                    <th style={{ padding: '10px', fontSize: '12px', color: '#888', textTransform: 'uppercase' }}>Email</th>
+                                    <th style={{ padding: '10px', fontSize: '12px', color: '#888', textTransform: 'uppercase' }}>Rôle / Droits</th>
+                                    <th style={{ padding: '10px', fontSize: '12px', color: '#888', textTransform: 'uppercase' }}>Action</th>
+                                </tr>
+                            </thead>
+                            <tbody>
+                                {members.map(m => (
+                                    <tr key={m.id} style={{ borderBottom: '1px solid #f9f9f9' }}>
+                                        <td style={{ padding: '15px 10px', fontWeight: '500' }}>
+                                            <div style={{ display: 'flex', alignItems: 'center', gap: '10px' }}>
+                                                <div style={{ width: '30px', height: '30px', borderRadius: '50%', background: m.role === 'admin' ? '#f06a6a' : '#3b82f6', color: 'white', display: 'flex', alignItems: 'center', justifyContent: 'center', fontWeight: 'bold', fontSize: '12px' }}>
+                                                    {m.username.charAt(0).toUpperCase()}
+                                                </div>
+                                                {m.username} {m.id === user.id && <span style={{ fontSize: '10px', color: '#aaa' }}>(Vous)</span>}
+                                            </div>
+                                        </td>
+                                        <td style={{ padding: '10px', color: '#666', fontSize: '14px' }}>{m.email}</td>
+                                        <td style={{ padding: '10px' }}>
+                                            <select 
+                                                value={m.role} 
+                                                onChange={(e) => changeRole(m.id, e.target.value)}
+                                                disabled={m.id === user.id} // On ne peut pas se modifier soi-même pour éviter de se bloquer
+                                                style={{ 
+                                                    padding: '5px 10px', 
+                                                    borderRadius: '20px', 
+                                                    border: '1px solid #e5e7eb', 
+                                                    background: m.role === 'admin' ? '#fef2f2' : '#eff6ff',
+                                                    color: m.role === 'admin' ? '#ef4444' : '#3b82f6',
+                                                    fontWeight: 'bold',
+                                                    fontSize: '12px',
+                                                    cursor: m.id === user.id ? 'not-allowed' : 'pointer'
+                                                }}
+                                            >
+                                                <option value="member">Membre (Lecture/Écriture)</option>
+                                                <option value="admin">Admin (Contrôle Total)</option>
+                                            </select>
+                                        </td>
+                                        <td style={{ padding: '10px' }}>
+                                            {m.id !== user.id && (
+                                                <button onClick={() => removeUser(m.id)} style={{ background: 'transparent', border: 'none', color: '#ef4444', cursor: 'pointer', fontSize: '18px' }} title="Supprimer">×</button>
+                                            )}
+                                        </td>
+                                    </tr>
+                                ))}
+                            </tbody>
+                        </table>
+                    </div>
+                </div>
+            </div>
+        </div>
+    );
 }
 
 // --- APP PRINCIPALE (Avec correction de sécurité) ---
