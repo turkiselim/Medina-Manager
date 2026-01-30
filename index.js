@@ -182,5 +182,16 @@ app.get('/update-db-v10', async (req, res) => {
     } catch (err) { res.status(500).send("Erreur V10: " + err.message); }
 });
 
+// --- ROUTE MAJ V10 (GANTT) ---
+app.get('/update-db-v10', async (req, res) => {
+    try {
+        // Ajout colonne Date de Début
+        await pool.query("ALTER TABLE tasks ADD COLUMN IF NOT EXISTS start_date DATE");
+        // On initialise les anciennes tâches pour qu'elles aient une date de début (date de création)
+        await pool.query("UPDATE tasks SET start_date = created_at::date WHERE start_date IS NULL");
+        res.send("Base de données prête pour la Chronologie !");
+    } catch (err) { res.status(500).send("Erreur V10: " + err.message); }
+});
+
 
 app.listen(PORT, () => console.log(`Server started on ${PORT}`));
