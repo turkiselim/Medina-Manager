@@ -1,7 +1,7 @@
 import { useEffect, useState } from 'react'
 import Login from './Login'
 
-const API_URL = 'https://medina-api-xxxx.onrender.com'; // <--- VOTRE URL RENDER ICI
+const API_URL = 'https://medina-api.onrender.com'; // <--- VOTRE URL RENDER ICI
 
 // --- MODALE TÂCHE (Standard) ---
 function TaskModal({ task, projectMembers, currentUser, onClose, onUpdate }) {
