@@ -92,15 +92,19 @@ app.post('/auth/register', async (req, res) => {
 app.post('/auth/login', async (req, res) => {
     try {
         const { email, password } = req.body;
-
-        // A. On cherche l'utilisateur par son email
         const userResult = await pool.query("SELECT * FROM users WHERE email = $1", [email]);
+        if (userResult.rows.length === 0) return res.status(401).json("Email inconnu");
         
-        if (userResult.rows.length === 0) {
-            return res.status(401).json("Email incorrect ou utilisateur inconnu");
-        }
-
         const user = userResult.rows[0];
+        const validPassword = await bcrypt.compare(password, user.password_hash);
+        if (!validPassword) return res.status(401).json("Mot de passe incorrect");
+        
+        const token = jwt.sign({ id: user.id, role: user.role }, process.env.JWT_SECRET, { expiresIn: "10h" });
+        
+        // ON RENVOIE LE ROLE ICI
+        res.json({ token, user: { id: user.id, username: user.username, email: user.email, role: user.role } });
+    } catch (err) { res.status(500).send("Erreur serveur"); }
+});
 
         // B. On vérifie si le mot de passe correspond au cryptage
         const validPassword = await bcrypt.compare(password, user.password_hash);
@@ -480,4 +484,44 @@ app.get('/update-db-v6', async (req, res) => {
     } catch (err) {
         res.status(500).send("Erreur V6: " + err.message);
     }
+});
+
+// --- COMMENTAIRES ---
+app.get('/tasks/:id/comments', async (req, res) => {
+    // On récupère le commentaire + le nom de celui qui l'a écrit
+    const comments = await pool.query(`
+        SELECT c.*, u.username 
+        FROM comments c 
+        JOIN users u ON c.user_id = u.id 
+        WHERE c.task_id = $1 
+        ORDER BY c.created_at DESC`, 
+    [req.params.id]);
+    res.json(comments.rows);
+});
+
+app.post('/comments', async (req, res) => {
+    const { task_id, user_id, content } = req.body;
+    const newComment = await pool.query(
+        "INSERT INTO comments (task_id, user_id, content) VALUES ($1, $2, $3) RETURNING *", 
+        [task_id, user_id, content]
+    );
+    // On renvoie le commentaire enrichi du nom d'utilisateur (pour l'affichage direct)
+    const enriched = await pool.query("SELECT c.*, u.username FROM comments c JOIN users u ON c.user_id = u.id WHERE c.id = $1", [newComment.rows[0].id]);
+    res.json(enriched.rows[0]);
+});
+
+// --- INVITATIONS (ADMIN SEULEMENT) ---
+app.post('/admin/invite', async (req, res) => {
+    const { email } = req.body;
+    // On génère un code unique (token) simple pour l'URL
+    const token = Math.random().toString(36).substring(7);
+    
+    await pool.query("INSERT INTO invitations (email, token) VALUES ($1, $2)", [email, token]);
+    
+    // Dans un vrai système, on envoie un email ici.
+    // Pour l'instant, on renvoie le lien à l'admin pour qu'il le donne via WhatsApp/Mail
+    const baseUrl = process.env.RENDER_EXTERNAL_URL || 'http://localhost:5000';
+    // ATTENTION : On renverra vers le SITE WEB (pas l'API)
+    // Adaptez ceci selon votre URL Frontend finale
+    res.json({ link: `https://medina-app.onrender.com/?token=${token}`, token: token }); 
 });
