@@ -268,9 +268,30 @@ export default function App() {
 
   // --- ACTIONS DE CRÉATION DEPUIS LA SIDEBAR ---
   const createSite = async (e) => {
-      e.preventDefault(); if(!newSiteName) return;
-      await fetch(`${API_URL}/sites`, { method:'POST', headers:{'Content-Type':'application/json'}, body:JSON.stringify({name: newSiteName, owner_id: user.id})});
-      setNewSiteName(""); loadData();
+      e.preventDefault();
+      if(!newSiteName) return;
+      
+      try {
+          console.log("Tentative de création site:", newSiteName, "par", user.id); // Pour le debug
+          
+          const res = await fetch(`${API_URL}/sites`, {
+              method:'POST', 
+              headers:{'Content-Type':'application/json'}, 
+              body:JSON.stringify({name: newSiteName, owner_id: user.id})
+          });
+
+          if (!res.ok) {
+              const errorText = await res.text();
+              throw new Error(errorText); // Si le serveur dit non, on déclenche l'erreur
+          }
+
+          setNewSiteName(""); 
+          loadData(); // On recharge la liste
+          
+      } catch (err) {
+          alert("Erreur lors de la création : " + err.message);
+          console.error(err);
+      }
   };
 
   const createProject = async (e, siteId) => {
@@ -317,12 +338,20 @@ export default function App() {
                 );
             })}
 
-            {/* FORMULAIRE CRÉATION SITE (Tout en bas) */}
+            {/* FORMULAIRE CRÉATION SITE */}
             {user.role === 'admin' && (
                 <div style={{padding:'10px 20px', marginTop:'10px', borderTop:'1px solid #333'}}>
                     <div className="sidebar-section" style={{marginTop:0, marginBottom:'5px'}}>NOUVEL ESPACE</div>
-                    <form onSubmit={createSite}>
-                        <input placeholder="+ Créer un Site (ex: Cuisine)" value={newSiteName} onChange={e=>setNewSiteName(e.target.value)} style={{width:'100%', padding:'8px', background:'#222', border:'1px solid #444', color:'white', borderRadius:'4px', fontSize:'12px'}} />
+                    <form onSubmit={createSite} style={{display:'flex', gap:'5px'}}>
+                        <input 
+                            placeholder="Nom (ex: Cuisine)" 
+                            value={newSiteName} 
+                            onChange={e=>setNewSiteName(e.target.value)} 
+                            style={{width:'100%', padding:'8px', background:'#222', border:'1px solid #444', color:'white', borderRadius:'4px', fontSize:'12px'}} 
+                        />
+                        <button type="submit" style={{background:'#f06a6a', border:'none', borderRadius:'4px', color:'white', cursor:'pointer', padding:'0 10px'}}>
+                            ➜
+                        </button>
                     </form>
                 </div>
             )}
