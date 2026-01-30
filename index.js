@@ -176,3 +176,12 @@ app.get('/users/:userId/activity', async (req, res) => {
     } catch (err) { res.status(500).send(err.message); }
 });
 
+// --- ROUTE MAJ V8 (SOFT DELETE) ---
+app.get('/update-db-v8', async (req, res) => {
+    try {
+        await pool.query("ALTER TABLE sites ADD COLUMN IF NOT EXISTS deleted_at TIMESTAMP DEFAULT NULL");
+        await pool.query("ALTER TABLE projects ADD COLUMN IF NOT EXISTS deleted_at TIMESTAMP DEFAULT NULL");
+        await pool.query("ALTER TABLE tasks ADD COLUMN IF NOT EXISTS deleted_at TIMESTAMP DEFAULT NULL");
+        res.send("Base de données prête pour la Corbeille !");
+    } catch (err) { res.status(500).send("Erreur V8: " + err.message); }
+});
