@@ -1,9 +1,9 @@
 import { useEffect, useState } from 'react'
 import Login from './Login'
 
-const API_URL = 'https://medina-api-xxxx.onrender.com'; // <--- VOTRE URL RENDER
+const API_URL = 'https://medina-api-xxxx.onrender.com'; // <--- VOTRE URL RENDER ICI
 
-// --- MODALE TÂCHE ---
+// --- MODALE TÂCHE (Standard) ---
 function TaskModal({ task, projectMembers, currentUser, onClose, onUpdate }) {
   const [formData, setFormData] = useState(task);
   const [subtasks, setSubtasks] = useState([]);
@@ -68,6 +68,7 @@ function TaskModal({ task, projectMembers, currentUser, onClose, onUpdate }) {
                 <div><label style={{fontSize:'11px', fontWeight:'bold', color:'#64748b'}}>STATUT</label><select value={formData.status||'todo'} onChange={e=>setFormData({...formData, status: e.target.value})} style={{width:'100%', padding:'8px', borderRadius:'6px', border:'1px solid #cbd5e1'}}><option value="todo">À Faire</option><option value="doing">En Cours</option><option value="done">Terminé</option></select></div>
                 <div><label style={{fontSize:'11px', fontWeight:'bold', color:'#64748b'}}>ASSIGNÉ À</label><select value={formData.assignee_id || ''} onChange={e=>setFormData({...formData, assignee_id: e.target.value})} style={{width:'100%', padding:'8px', borderRadius:'6px', border:'1px solid #cbd5e1'}}><option value="">-- Personne --</option>{projectMembers.map(m => <option key={m.id} value={m.id}>{m.username}</option>)}</select></div>
                 <div><label style={{fontSize:'11px', fontWeight:'bold', color:'#64748b'}}>ÉCHÉANCE</label><input type="date" value={formData.due_date ? formData.due_date.split('T')[0] : ''} onChange={e=>setFormData({...formData, due_date: e.target.value})} style={{width:'100%', padding:'8px', borderRadius:'6px', border:'1px solid #cbd5e1'}} /></div>
+                <div><label style={{fontSize:'11px', fontWeight:'bold', color:'#64748b'}}>PRIORITÉ</label><select value={formData.priority||'medium'} onChange={e=>setFormData({...formData, priority:e.target.value})} style={{width:'100%', padding:'8px', borderRadius:'6px', border:'1px solid #cbd5e1'}}><option value="low">🟢 Basse</option><option value="medium">🟡 Moyenne</option><option value="high">🔴 Haute</option></select></div>
                 <div><label style={{fontSize:'11px', fontWeight:'bold', color:'#64748b'}}>PIÈCE JOINTE</label><div style={{display:'flex', alignItems:'center', gap:'10px', marginTop:'5px'}}><label style={{padding:'6px 10px', border:'1px solid #cbd5e1', borderRadius:'6px', cursor:'pointer', background:'white', fontSize:'12px'}}>📎 Upload<input type="file" onChange={handleFileUpload} style={{display:'none'}} /></label>{formData.attachment_url && <a href={formData.attachment_url} target="_blank" style={{color:'#3b82f6', fontSize:'12px'}}>📄 Voir</a>}</div></div>
                 <div style={{marginTop:'auto', paddingTop:'20px'}}><button onClick={handleSaveMain} style={{width:'100%', padding:'10px', background:'#3b82f6', color:'white', border:'none', borderRadius:'6px', cursor:'pointer', fontWeight:'bold'}}>Enregistrer</button></div>
             </div>
@@ -77,17 +78,15 @@ function TaskModal({ task, projectMembers, currentUser, onClose, onUpdate }) {
   );
 }
 
-// --- DASHBOARD (NOUVEAU) ---
+// --- DASHBOARD (Avec activité globale) ---
 function Dashboard({ user, onOpenProject }) {
-    const [myTasks, setMyTasks] = useState([]);
-    const [activity, setActivity] = useState([]); // Nouveau
+    const [activity, setActivity] = useState([]);
     const [stats, setStats] = useState({ projects: 0, pending: 0, completed: 0 });
     const [recentProjects, setRecentProjects] = useState([]);
 
     useEffect(() => {
         if (!user) return;
-        fetch(`${API_URL}/users/${user.id}/tasks`).then(res=>res.json()).then(setMyTasks).catch(console.error);
-        fetch(`${API_URL}/users/${user.id}/activity`).then(res=>res.json()).then(setActivity).catch(console.error); // Nouveau
+        fetch(`${API_URL}/users/${user.id}/activity`).then(res=>res.json()).then(setActivity).catch(console.error);
         fetch(`${API_URL}/stats/${user.id}`).then(res=>res.json()).then(setStats).catch(console.error);
         fetch(`${API_URL}/projects`).then(res=>res.json()).then(data => setRecentProjects(data.slice(0, 4))).catch(console.error);
     }, [user]);
@@ -99,38 +98,29 @@ function Dashboard({ user, onOpenProject }) {
             <div className="dash-header">
                 <div className="date-sub">{today}</div>
                 <div className="greeting">Bonjour, {user.username}</div>
-                
-                {/* STATS */}
                 <div style={{display:'flex', gap:'20px', marginTop:'20px'}}>
-                    <div style={{background:'white', padding:'20px', borderRadius:'10px', border:'1px solid #e0e0e0', flex:1, textAlign:'center', boxShadow:'0 2px 5px rgba(0,0,0,0.02)'}}>
+                    <div style={{background:'white', padding:'20px', borderRadius:'10px', border:'1px solid #e0e0e0', flex:1, textAlign:'center'}}>
                         <div style={{fontSize:'32px', fontWeight:'bold', color:'#333'}}>{stats.pending}</div>
                         <div style={{fontSize:'12px', color:'#888', textTransform:'uppercase', fontWeight:'bold'}}>Tâches à faire</div>
                     </div>
-                    <div style={{background:'white', padding:'20px', borderRadius:'10px', border:'1px solid #e0e0e0', flex:1, textAlign:'center', boxShadow:'0 2px 5px rgba(0,0,0,0.02)'}}>
+                    <div style={{background:'white', padding:'20px', borderRadius:'10px', border:'1px solid #e0e0e0', flex:1, textAlign:'center'}}>
                         <div style={{fontSize:'32px', fontWeight:'bold', color:'#333'}}>{stats.projects}</div>
                         <div style={{fontSize:'12px', color:'#888', textTransform:'uppercase', fontWeight:'bold'}}>Projets actifs</div>
-                    </div>
-                    <div style={{background:'white', padding:'20px', borderRadius:'10px', border:'1px solid #e0e0e0', flex:1, textAlign:'center', boxShadow:'0 2px 5px rgba(0,0,0,0.02)'}}>
-                        <div style={{fontSize:'32px', fontWeight:'bold', color:'#10b981'}}>{stats.completed}</div>
-                        <div style={{fontSize:'12px', color:'#888', textTransform:'uppercase', fontWeight:'bold'}}>Tâches terminées</div>
                     </div>
                 </div>
             </div>
 
-            <div className="dash-grid" style={{paddingBottom:'50px'}}>
-                {/* WIDGET ACTIVITÉ (REMPLIT LE VIDE) */}
+            <div className="dash-grid">
                 <div className="widget-card">
-                    <div className="widget-header"><span>📢 Activité Récente de l'Hôtel</span></div>
+                    <div className="widget-header"><span>📢 Activité Globale (Hôtel)</span></div>
                     <div style={{flex:1}}>
-                        {activity.length === 0 ? <div style={{padding:'20px', textAlign:'center', color:'#888'}}>Aucune activité. Créez des tâches !</div> : 
+                        {activity.length === 0 ? <div style={{padding:'20px', textAlign:'center', color:'#888'}}>Aucune activité. Créez votre premier projet !</div> : 
                             activity.map(t => (
                                 <div key={t.id} className="task-row">
-                                    <div style={{width:'30px', height:'30px', background:'#eee', borderRadius:'50%', display:'flex', alignItems:'center', justifyContent:'center', fontSize:'12px'}}>📝</div>
+                                    <div style={{width:'30px', height:'30px', background:'#eee', borderRadius:'50%', display:'flex', alignItems:'center', justifyContent:'center'}}>📝</div>
                                     <div style={{flex:1}}>
                                         <div style={{fontSize:'14px', fontWeight:'500'}}>{t.title}</div>
-                                        <div style={{fontSize:'11px', color:'#888'}}>
-                                            {t.assignee_name ? `Assigné à ${t.assignee_name}` : 'Non assigné'} • Dans <b>{t.project_name}</b>
-                                        </div>
+                                        <div style={{fontSize:'11px', color:'#888'}}>Dans {t.project_name} • {t.status}</div>
                                     </div>
                                     <div style={{fontSize:'11px', color:'#aaa'}}>{new Date(t.created_at || Date.now()).toLocaleDateString()}</div>
                                 </div>
@@ -138,14 +128,12 @@ function Dashboard({ user, onOpenProject }) {
                         }
                     </div>
                 </div>
-
-                {/* WIDGET PROJETS */}
                 <div className="widget-card">
                     <div className="widget-header"><span>📂 Projets Récents</span></div>
                     <div style={{padding:'10px'}}>
                         {recentProjects.map(p => (
-                            <div key={p.id} onClick={() => onOpenProject(p)} style={{padding:'10px', display:'flex', alignItems:'center', gap:'10px', cursor:'pointer', borderRadius:'6px', transition:'background 0.2s'}} onMouseOver={e=>e.currentTarget.style.background='#f5f5f5'} onMouseOut={e=>e.currentTarget.style.background='white'}>
-                                <div style={{width:'32px', height:'32px', background: '#f06a6a', borderRadius:'6px', display:'flex', alignItems:'center', justifyContent:'center', color:'white', fontSize:'14px', fontWeight:'bold'}}>{p.name.charAt(0).toUpperCase()}</div>
+                            <div key={p.id} onClick={() => onOpenProject(p)} style={{padding:'10px', display:'flex', alignItems:'center', gap:'10px', cursor:'pointer', borderRadius:'6px'}} onMouseOver={e=>e.currentTarget.style.background='#f5f5f5'} onMouseOut={e=>e.currentTarget.style.background='white'}>
+                                <div style={{width:'32px', height:'32px', background: '#f06a6a', borderRadius:'6px', display:'flex', alignItems:'center', justifyContent:'center', color:'white', fontWeight:'bold'}}>{p.name.charAt(0).toUpperCase()}</div>
                                 <div style={{fontSize:'14px', fontWeight:'500'}}>{p.name}</div>
                             </div>
                         ))}
@@ -156,10 +144,9 @@ function Dashboard({ user, onOpenProject }) {
     )
 }
 
-// --- VUE PROJET ---
+// --- VUE PROJET (Kanban + Liste) ---
 function ProjectView({ project, tasks, members, viewMode, setViewMode, onAddTask, onEditTask, onUpdateTask, onInvite, user }) {
     const [newTaskTitle, setNewTaskTitle] = useState("");
-
     const handleDragStart = (e, taskId) => e.dataTransfer.setData("taskId", taskId);
     const handleDragOver = (e) => e.preventDefault();
     const handleDrop = (e, newStatus) => { const id = e.dataTransfer.getData("taskId"); const task = tasks.find(t => t.id.toString() === id); if (task && task.status !== newStatus) onUpdateTask({ ...task, status: newStatus }); };
@@ -169,7 +156,7 @@ function ProjectView({ project, tasks, members, viewMode, setViewMode, onAddTask
             <div style={{display:'flex', justifyContent:'space-between', alignItems:'center', marginBottom:'20px'}}>
                 <div style={{display:'flex', alignItems:'center', gap:'15px'}}>
                     <div style={{width:'40px', height:'40px', background:'#f06a6a', borderRadius:'8px', display:'flex', alignItems:'center', justifyContent:'center', color:'white', fontSize:'18px', fontWeight:'bold'}}>{project.name.charAt(0)}</div>
-                    <div><h1 style={{margin:0, fontSize:'20px'}}>{project.name}</h1><div style={{fontSize:'13px', color:'#888'}}>Projet • {members.length} membres</div></div>
+                    <div><h1 style={{margin:0, fontSize:'20px'}}>{project.name}</h1><div style={{fontSize:'13px', color:'#888'}}>{members.length} membres</div></div>
                 </div>
                 <div style={{display:'flex', gap:'10px'}}>
                     <div style={{background:'white', border:'1px solid #ddd', borderRadius:'6px', display:'flex', padding:'2px'}}>
@@ -180,7 +167,6 @@ function ProjectView({ project, tasks, members, viewMode, setViewMode, onAddTask
                 </div>
             </div>
 
-            {/* VUE KANBAN */}
             {viewMode === 'board' && (
                 <div style={{display:'flex', gap:'20px', overflowX:'auto', height:'100%', alignItems:'flex-start'}}>
                     {['todo', 'doing', 'done'].map(status => (
@@ -194,7 +180,7 @@ function ProjectView({ project, tasks, members, viewMode, setViewMode, onAddTask
                                     <input placeholder="+ Ajouter une tâche" value={newTaskTitle} onChange={e=>setNewTaskTitle(e.target.value)} style={{width:'100%', padding:'10px', border:'1px solid transparent', borderRadius:'8px', outline:'none', boxShadow:'0 1px 3px rgba(0,0,0,0.05)'}} />
                                 </form>
                             )}
-                            <div style={{display:'flex', flexDirection:'column', gap:'10px', minHeight:'100px'}}>
+                            <div style={{display:'flex', flexDirection:'column', gap:'10px'}}>
                                 {tasks.filter(t=>t.status===status).map(t => {
                                     const assignee = members.find(m => m.id === t.assignee_id);
                                     return (
@@ -212,31 +198,20 @@ function ProjectView({ project, tasks, members, viewMode, setViewMode, onAddTask
                     ))}
                 </div>
             )}
-
-            {/* VUE LISTE (CORRIGÉE) */}
+            
             {viewMode === 'list' && (
                 <div style={{background:'white', borderRadius:'8px', border:'1px solid #e0e0e0', overflow:'hidden'}}>
                      <table style={{width:'100%', borderCollapse:'collapse', color:'#333'}}>
                         <thead style={{background:'#f9f9f9', borderBottom:'1px solid #eee'}}>
-                            <tr>
-                                <th style={{padding:'12px', textAlign:'left', fontSize:'12px', color:'#666', textTransform:'uppercase'}}>Titre</th>
-                                <th style={{padding:'12px', textAlign:'left', fontSize:'12px', color:'#666', textTransform:'uppercase'}}>Statut</th>
-                                <th style={{padding:'12px', textAlign:'left', fontSize:'12px', color:'#666', textTransform:'uppercase'}}>Assigné</th>
-                                <th style={{padding:'12px', textAlign:'left', fontSize:'12px', color:'#666', textTransform:'uppercase'}}>Date</th>
-                            </tr>
+                            <tr><th style={{padding:'12px', textAlign:'left', fontSize:'12px', color:'#666', textTransform:'uppercase'}}>Titre</th><th style={{padding:'12px', textAlign:'left', fontSize:'12px', color:'#666', textTransform:'uppercase'}}>Statut</th><th style={{padding:'12px', textAlign:'left', fontSize:'12px', color:'#666', textTransform:'uppercase'}}>Assigné</th><th style={{padding:'12px', textAlign:'left', fontSize:'12px', color:'#666', textTransform:'uppercase'}}>Date</th></tr>
                         </thead>
                         <tbody>
-                            {tasks.length === 0 && <tr><td colSpan="4" style={{padding:'20px', textAlign:'center', color:'#888'}}>Aucune tâche.</td></tr>}
                             {tasks.map(t => {
                                 const assignee = members.find(m => m.id === t.assignee_id);
                                 return (
                                     <tr key={t.id} onClick={()=>onEditTask(t)} style={{borderBottom:'1px solid #f5f5f5', cursor:'pointer', height:'45px'}}>
                                         <td style={{padding:'12px', fontWeight:'500'}}>{t.title}</td>
-                                        <td style={{padding:'12px'}}>
-                                            <span style={{padding:'4px 10px', borderRadius:'12px', fontSize:'11px', fontWeight:'bold', background: t.status==='done'?'#dcfce7':t.status==='doing'?'#dbeafe':'#f3f4f6', color: t.status==='done'?'#166534':t.status==='doing'?'#1e40af':'#4b5563'}}>
-                                                {t.status === 'todo' ? 'À faire' : t.status === 'doing' ? 'En cours' : 'Terminé'}
-                                            </span>
-                                        </td>
+                                        <td style={{padding:'12px'}}><span style={{padding:'4px 10px', borderRadius:'12px', fontSize:'11px', fontWeight:'bold', background: t.status==='done'?'#dcfce7':t.status==='doing'?'#dbeafe':'#f3f4f6', color: t.status==='done'?'#166534':t.status==='doing'?'#1e40af':'#4b5563'}}>{t.status === 'todo' ? 'À faire' : t.status === 'doing' ? 'En cours' : 'Terminé'}</span></td>
                                         <td style={{padding:'12px'}}>{assignee ? assignee.username : '-'}</td>
                                         <td style={{padding:'12px', color:'#888'}}>{t.due_date ? new Date(t.due_date).toLocaleDateString() : ''}</td>
                                     </tr>
@@ -255,22 +230,10 @@ function MembersView({ user }) {
     const [email, setEmail] = useState("");
     const [inviteLink, setInviteLink] = useState("");
     const handleInvite = async (e) => { e.preventDefault(); const res = await fetch(`${API_URL}/admin/invite`, { method:'POST', headers:{'Content-Type':'application/json'}, body:JSON.stringify({email}) }); const json = await res.json(); setInviteLink(json.link.replace('http://localhost:5000', 'https://medina-app.onrender.com')); };
-    return (
-        <div style={{padding:'40px'}}>
-            <h1>Gestion des Membres</h1>
-            <div style={{background:'white', padding:'30px', borderRadius:'10px', border:'1px solid #eee', maxWidth:'500px', marginTop:'20px'}}>
-                <h3>Envoyer une invitation</h3>
-                <form onSubmit={handleInvite} style={{display:'flex', gap:'10px', flexDirection:'column'}}>
-                    <input type="email" value={email} onChange={e=>setEmail(e.target.value)} placeholder="Email du collaborateur" style={{padding:'10px', border:'1px solid #ccc', borderRadius:'6px'}} required />
-                    <button type="submit" style={{padding:'10px', background:'#10b981', color:'white', border:'none', borderRadius:'6px', cursor:'pointer', fontWeight:'bold'}}>Générer le lien</button>
-                </form>
-                {inviteLink && <div style={{marginTop:'20px', background:'#f0fdf4', padding:'15px', borderRadius:'6px', border:'1px solid #bbf7d0'}}><div style={{fontWeight:'bold', color:'#166534'}}>Lien généré :</div><input readOnly value={inviteLink} style={{width:'100%', padding:'10px', border:'1px solid #ccc', borderRadius:'4px', marginTop:'5px'}} /></div>}
-            </div>
-        </div>
-    );
+    return (<div style={{padding:'40px'}}><h1>Membres</h1><div style={{background:'white', padding:'30px', borderRadius:'10px', border:'1px solid #eee', maxWidth:'500px'}}><form onSubmit={handleInvite}><input type="email" value={email} onChange={e=>setEmail(e.target.value)} placeholder="Email" style={{padding:'10px', width:'100%', marginBottom:'10px'}} /><button type="submit" style={{width:'100%', padding:'10px', background:'#10b981', color:'white', border:'none'}}>Générer</button></form>{inviteLink && <input readOnly value={inviteLink} style={{width:'100%', marginTop:'10px', padding:'10px'}} />}</div></div>);
 }
 
-// --- APP ---
+// --- APP PRINCIPALE ---
 export default function App() {
   const [token, setToken] = useState(localStorage.getItem('hotel_token'));
   const [user, setUser] = useState(() => { const s = localStorage.getItem('hotel_user'); return s ? JSON.parse(s) : null; });
@@ -282,33 +245,69 @@ export default function App() {
   const [viewMode, setViewMode] = useState('board');
   const [editingTask, setEditingTask] = useState(null);
 
+  // ÉTATS POUR LA CRÉATION
+  const [newSiteName, setNewSiteName] = useState("");
+  const [newProjectName, setNewProjectName] = useState("");
+  const [creatingProjectForSite, setCreatingProjectForSite] = useState(null); // ID du site où on veut créer un projet
+
   const handleLogin = (tok, usr) => { setToken(tok); setUser(usr); localStorage.setItem('hotel_token', tok); localStorage.setItem('hotel_user', JSON.stringify(usr)); };
   const handleLogout = () => { setToken(null); setUser(null); localStorage.removeItem('hotel_token'); localStorage.removeItem('hotel_user'); };
 
-  useEffect(() => { if (token) { Promise.all([fetch(`${API_URL}/sites`).then(r=>r.json()), fetch(`${API_URL}/projects`).then(r=>r.json())]).then(([s, p]) => { setSites(s); setProjects(p); }); } }, [token]);
+  // Rechargement des données
+  const loadData = () => {
+    Promise.all([fetch(`${API_URL}/sites`).then(r=>r.json()), fetch(`${API_URL}/projects`).then(r=>r.json())])
+    .then(([s, p]) => { setSites(s); setProjects(p); });
+  };
+  useEffect(() => { if (token) loadData(); }, [token]);
+
   useEffect(() => { if (selectedProject) { Promise.all([fetch(`${API_URL}/tasks/${selectedProject.id}`).then(r=>r.json()), fetch(`${API_URL}/projects/${selectedProject.id}/members`).then(r=>r.json())]).then(([t, m]) => { setProjectData({ tasks: t, members: m }); }); } }, [selectedProject]);
 
   const navToProject = (p) => { setSelectedProject(p); setActiveTab(`project-${p.id}`); };
   const createTask = async (title) => { const res = await fetch(`${API_URL}/tasks`, { method:'POST', headers:{'Content-Type':'application/json'}, body:JSON.stringify({project_id: selectedProject.id, title})}); const t = await res.json(); setProjectData({...projectData, tasks: [...projectData.tasks, t]}); };
   const updateTask = async (uT) => { setProjectData(prev => ({ ...prev, tasks: prev.tasks.map(t => t.id === uT.id ? uT : t) })); await fetch(`${API_URL}/tasks/${uT.id}`, { method: 'PUT', headers: {'Content-Type': 'application/json'}, body: JSON.stringify(uT) }); };
 
-  if (token && !user) { handleLogout(); return <Login onLogin={handleLogin} />; }
+  // --- ACTIONS DE CRÉATION DEPUIS LA SIDEBAR ---
+  const createSite = async (e) => {
+      e.preventDefault(); if(!newSiteName) return;
+      await fetch(`${API_URL}/sites`, { method:'POST', headers:{'Content-Type':'application/json'}, body:JSON.stringify({name: newSiteName, owner_id: user.id})});
+      setNewSiteName(""); loadData();
+  };
+
+  const createProject = async (e, siteId) => {
+      e.preventDefault(); if(!newProjectName) return;
+      const res = await fetch(`${API_URL}/projects`, { method:'POST', headers:{'Content-Type':'application/json'}, body:JSON.stringify({name: newProjectName, owner_id: user.id, site_id: siteId})});
+      const newProj = await res.json();
+      setNewProjectName(""); setCreatingProjectForSite(null); loadData(); navToProject(newProj);
+  };
+
   if (!token) return <Login onLogin={handleLogin} />;
 
   return (
     <div style={{display:'flex', height:'100vh', width:'100vw'}}>
         {editingTask && <TaskModal task={editingTask} projectMembers={projectData.members} currentUser={user} onClose={()=>setEditingTask(null)} onUpdate={updateTask} />}
-        <div className="sidebar" style={{width:'240px', flexShrink:0}}>
+
+        <div className="sidebar" style={{width:'250px', flexShrink:0, overflowY:'auto'}}>
             <div className="sidebar-header"><span style={{background:'#f06a6a', width:'24px', height:'24px', borderRadius:'6px', display:'inline-block', marginRight:'10px'}}></span>MedinaOS</div>
             <div className="sidebar-section">Général</div>
             <div className={`nav-item ${activeTab==='home'?'active':''}`} onClick={()=>{setActiveTab('home'); setSelectedProject(null)}}>🏠 Accueil</div>
             {user.role === 'admin' && <div className={`nav-item ${activeTab==='members'?'active':''}`} onClick={()=>{setActiveTab('members'); setSelectedProject(null)}}>👥 Membres</div>}
+            
+            {/* LISTE DES SITES ET PROJETS */}
             {sites.map(site => {
                 const sp = projects.filter(p => p.site_id === site.id);
-                if (sp.length === 0) return null;
                 return (
                     <div key={site.id}>
-                        <div className="sidebar-section">🏢 {site.name}</div>
+                        <div className="sidebar-section" style={{display:'flex', justifyContent:'space-between', alignItems:'center'}}>
+                            <span>🏢 {site.name}</span>
+                            {user.role === 'admin' && <button onClick={()=>setCreatingProjectForSite(creatingProjectForSite===site.id ? null : site.id)} style={{background:'none', border:'none', color:'#666', cursor:'pointer', fontWeight:'bold'}} title="Créer un projet ici">+</button>}
+                        </div>
+                        {/* FORMULAIRE CRÉATION PROJET (Si cliqué sur +) */}
+                        {creatingProjectForSite === site.id && (
+                            <form onSubmit={(e)=>createProject(e, site.id)} style={{padding:'0 20px 10px'}}>
+                                <input autoFocus placeholder="Nom du projet..." value={newProjectName} onChange={e=>setNewProjectName(e.target.value)} style={{width:'100%', padding:'5px', fontSize:'12px', background:'#333', border:'1px solid #555', color:'white', borderRadius:'4px'}} />
+                            </form>
+                        )}
+                        {/* LISTE DES PROJETS */}
                         {sp.map(p => (
                             <div key={p.id} className={`nav-item ${activeTab===`project-${p.id}`?'active':''}`} onClick={() => navToProject(p)}>
                                 <span style={{width:'8px', height:'8px', borderRadius:'50%', background: activeTab===`project-${p.id}`?'#f06a6a':'#666'}}></span>{p.name}
@@ -317,8 +316,20 @@ export default function App() {
                     </div>
                 );
             })}
+
+            {/* FORMULAIRE CRÉATION SITE (Tout en bas) */}
+            {user.role === 'admin' && (
+                <div style={{padding:'10px 20px', marginTop:'10px', borderTop:'1px solid #333'}}>
+                    <div className="sidebar-section" style={{marginTop:0, marginBottom:'5px'}}>NOUVEL ESPACE</div>
+                    <form onSubmit={createSite}>
+                        <input placeholder="+ Créer un Site (ex: Cuisine)" value={newSiteName} onChange={e=>setNewSiteName(e.target.value)} style={{width:'100%', padding:'8px', background:'#222', border:'1px solid #444', color:'white', borderRadius:'4px', fontSize:'12px'}} />
+                    </form>
+                </div>
+            )}
+
             <div style={{marginTop:'auto', padding:'20px'}}><button onClick={handleLogout} style={{background:'transparent', border:'1px solid #444', color:'#aaa', width:'100%', padding:'8px', borderRadius:'6px', cursor:'pointer'}}>Déconnexion</button></div>
         </div>
+
         <div style={{flex:1, overflow:'hidden', background:'white'}}>
             {activeTab === 'home' && <Dashboard user={user} onOpenProject={navToProject} />}
             {activeTab === 'members' && <MembersView user={user} />}
