@@ -1,61 +1,40 @@
 import { useEffect, useState } from 'react'
 import Login from './Login'
 
-// --- CONFIGURATION ---
-const API_URL = 'https://medina-api.onrender.com'; // <--- VOTRE BACKEND
-const SITE_URL = 'https://medina-app.onrender.com'; // <--- VOTRE FRONTEND (SITE WEB)
+const API_URL = 'https://medina-api-xxxx.onrender.com'; // <--- VOTRE URL RENDER
 
-// --- MODALE TÂCHE (AVEC COMMENTAIRES) ---
+// --- MODALE TÂCHE ---
 function TaskModal({ task, projectMembers, currentUser, onClose, onUpdate }) {
   const [formData, setFormData] = useState(task);
   const [subtasks, setSubtasks] = useState([]);
-  const [comments, setComments] = useState([]); // Nouveau : Commentaires
+  const [comments, setComments] = useState([]);
   const [newSubtaskTitle, setNewSubtaskTitle] = useState("");
   const [newComment, setNewComment] = useState("");
 
   useEffect(() => {
-      fetch(`${API_URL}/tasks/${task.id}/subtasks`).then(res => res.json()).then(setSubtasks).catch(e=>console.log(e));
-      fetch(`${API_URL}/tasks/${task.id}/comments`).then(res => res.json()).then(setComments).catch(e=>console.log(e));
+      fetch(`${API_URL}/tasks/${task.id}/subtasks`).then(res => res.json()).then(setSubtasks).catch(console.error);
+      fetch(`${API_URL}/tasks/${task.id}/comments`).then(res => res.json()).then(setComments).catch(console.error);
   }, [task]);
 
   const handleSaveMain = () => { onUpdate(formData); onClose(); };
-
-  // Logique Sous-tâches (inchangée)
   const addSubtask = async (e) => { e.preventDefault(); if(!newSubtaskTitle) return; const res = await fetch(`${API_URL}/subtasks`, { method:'POST', headers:{'Content-Type':'application/json'}, body:JSON.stringify({task_id: task.id, title: newSubtaskTitle})}); const json = await res.json(); setSubtasks([...subtasks, json]); setNewSubtaskTitle(""); };
-  const updateSubtask = async (updatedSt) => { setSubtasks(subtasks.map(st => st.id === updatedSt.id ? updatedSt : st)); await fetch(`${API_URL}/subtasks/${updatedSt.id}`, { method:'PUT', headers:{'Content-Type':'application/json'}, body:JSON.stringify(updatedSt)}); };
-  const deleteSubtask = async (id) => { setSubtasks(subtasks.filter(st => st.id !== id)); await fetch(`${API_URL}/subtasks/${id}`, { method:'DELETE' }); };
-
-  // Logique Commentaires (NOUVEAU)
-  const sendComment = async (e) => {
-      e.preventDefault(); if(!newComment) return;
-      const res = await fetch(`${API_URL}/comments`, { method:'POST', headers:{'Content-Type':'application/json'}, body:JSON.stringify({task_id: task.id, user_id: currentUser.id, content: newComment})});
-      const json = await res.json();
-      setComments([json, ...comments]); // Ajoute en haut
-      setNewComment("");
-  };
-
-  const handleFileUpload = async (e) => {
-      const file = e.target.files[0]; if (!file) return;
-      const data = new FormData(); data.append('file', file);
-      try { const res = await fetch(`${API_URL}/upload`, { method: 'POST', body: data }); const json = await res.json(); setFormData({ ...formData, attachment_url: json.url }); } catch (err) { alert("Erreur upload"); }
-  };
+  const updateSubtask = async (u) => { setSubtasks(subtasks.map(s => s.id === u.id ? u : s)); await fetch(`${API_URL}/subtasks/${u.id}`, { method:'PUT', headers:{'Content-Type':'application/json'}, body:JSON.stringify(u)}); };
+  const deleteSubtask = async (id) => { setSubtasks(subtasks.filter(s => s.id !== id)); await fetch(`${API_URL}/subtasks/${id}`, { method:'DELETE' }); };
+  const sendComment = async (e) => { e.preventDefault(); if(!newComment) return; const res = await fetch(`${API_URL}/comments`, { method:'POST', headers:{'Content-Type':'application/json'}, body:JSON.stringify({task_id: task.id, user_id: currentUser.id, content: newComment})}); const json = await res.json(); setComments([json, ...comments]); setNewComment(""); };
+  const handleFileUpload = async (e) => { const f = e.target.files[0]; if (!f) return; const d = new FormData(); d.append('file', f); try { const res = await fetch(`${API_URL}/upload`, { method: 'POST', body: d }); const j = await res.json(); setFormData({ ...formData, attachment_url: j.url }); } catch (err) { alert("Erreur upload"); } };
 
   return (
-    <div style={{position:'fixed', inset:0, background:'rgba(0,0,0,0.5)', display:'flex', justifyContent:'center', alignItems:'center', zIndex:2000}}>
-      <div style={{background:'white', width:'900px', height:'90vh', borderRadius:'12px', display:'flex', flexDirection:'column', overflow:'hidden', boxShadow:'0 25px 50px -12px rgba(0, 0, 0, 0.25)'}}>
-        
+    <div style={{position:'fixed', inset:0, background:'rgba(0,0,0,0.6)', display:'flex', justifyContent:'center', alignItems:'center', zIndex:2000, backdropFilter:'blur(2px)'}}>
+      <div style={{background:'white', width:'900px', height:'90vh', borderRadius:'12px', display:'flex', flexDirection:'column', overflow:'hidden', boxShadow:'0 25px 50px -12px rgba(0,0,0,0.25)'}}>
         <div style={{padding:'20px', borderBottom:'1px solid #e2e8f0', display:'flex', justifyContent:'space-between', alignItems:'center'}}>
              <input value={formData.title} onChange={e=>setFormData({...formData, title:e.target.value})} style={{fontSize:'20px', fontWeight:'bold', border:'none', width:'100%', outline:'none'}} />
              <button onClick={onClose} style={{background:'none', border:'none', fontSize:'24px', cursor:'pointer', color:'#64748b'}}>✕</button>
         </div>
-        
         <div style={{display:'flex', flex:1, overflow:'hidden'}}>
-            {/* GAUCHE : Description, Sous-tâches, Commentaires */}
             <div style={{flex:2, padding:'25px', overflowY:'auto', borderRight:'1px solid #e2e8f0'}}>
                 <label style={{fontSize:'12px', fontWeight:'bold', color:'#94a3b8', textTransform:'uppercase'}}>Description</label>
                 <textarea value={formData.description||''} onChange={e=>setFormData({...formData, description:e.target.value})} rows="3" style={{width:'100%', padding:'10px', marginTop:'8px', marginBottom:'20px', border:'1px solid #e2e8f0', borderRadius:'6px'}} placeholder="Détails..." />
-
-                {/* Sous-tâches */}
+                
                 <div style={{background:'#f8fafc', padding:'15px', borderRadius:'8px', border:'1px solid #e2e8f0', marginBottom:'20px'}}>
                     <label style={{fontWeight:'bold', color:'#475569', display:'block', marginBottom:'10px'}}>✅ Sous-tâches</label>
                     {subtasks.map(st => (
@@ -68,11 +47,10 @@ function TaskModal({ task, projectMembers, currentUser, onClose, onUpdate }) {
                     <form onSubmit={addSubtask}><input placeholder="+ Étape" value={newSubtaskTitle} onChange={e=>setNewSubtaskTitle(e.target.value)} style={{width:'100%', padding:'5px', border:'1px solid #cbd5e1', borderRadius:'4px', marginTop:'5px'}} /></form>
                 </div>
 
-                {/* Commentaires (CHAT) */}
-                <div style={{marginTop:'20px'}}>
+                <div>
                     <label style={{fontWeight:'bold', color:'#475569', display:'block', marginBottom:'10px'}}>💬 Commentaires</label>
                     <div style={{background:'#f1f5f9', padding:'15px', borderRadius:'8px', maxHeight:'200px', overflowY:'auto', marginBottom:'10px'}}>
-                        {comments.length === 0 && <div style={{fontSize:'12px', color:'#aaa', textAlign:'center'}}>Aucun commentaire. Écrivez quelque chose...</div>}
+                        {comments.length === 0 && <div style={{fontSize:'12px', color:'#aaa', textAlign:'center'}}>Aucun commentaire.</div>}
                         {comments.map(c => (
                             <div key={c.id} style={{marginBottom:'10px', background:'white', padding:'8px', borderRadius:'6px', boxShadow:'0 1px 2px rgba(0,0,0,0.05)'}}>
                                 <div style={{fontSize:'11px', fontWeight:'bold', color:'#3b82f6', marginBottom:'2px'}}>{c.username} <span style={{color:'#aaa', fontWeight:'normal'}}>{new Date(c.created_at).toLocaleString()}</span></div>
@@ -86,36 +64,12 @@ function TaskModal({ task, projectMembers, currentUser, onClose, onUpdate }) {
                     </form>
                 </div>
             </div>
-
-            {/* DROITE : Attributs */}
             <div style={{flex:1, padding:'25px', background:'#f9fafb', display:'flex', flexDirection:'column', gap:'15px'}}>
-                <div>
-                    <label style={{fontSize:'11px', fontWeight:'bold', color:'#64748b'}}>STATUT</label>
-                    <select value={formData.status||'todo'} onChange={e=>setFormData({...formData, status: e.target.value})} style={{width:'100%', padding:'8px', borderRadius:'6px', border:'1px solid #cbd5e1'}}>
-                        <option value="todo">À Faire</option><option value="doing">En Cours</option><option value="done">Terminé</option>
-                    </select>
-                </div>
-                <div>
-                    <label style={{fontSize:'11px', fontWeight:'bold', color:'#64748b'}}>ASSIGNÉ À</label>
-                    <select value={formData.assignee_id || ''} onChange={e=>setFormData({...formData, assignee_id: e.target.value})} style={{width:'100%', padding:'8px', borderRadius:'6px', border:'1px solid #cbd5e1'}}>
-                        <option value="">-- Personne --</option>
-                        {projectMembers.map(m => <option key={m.id} value={m.id}>{m.username}</option>)}
-                    </select>
-                </div>
-                <div>
-                    <label style={{fontSize:'11px', fontWeight:'bold', color:'#64748b'}}>ÉCHÉANCE</label>
-                    <input type="date" value={formData.due_date ? formData.due_date.split('T')[0] : ''} onChange={e=>setFormData({...formData, due_date: e.target.value})} style={{width:'100%', padding:'8px', borderRadius:'6px', border:'1px solid #cbd5e1'}} />
-                </div>
-                <div>
-                    <label style={{fontSize:'11px', fontWeight:'bold', color:'#64748b'}}>PIÈCE JOINTE</label>
-                    <div style={{display:'flex', alignItems:'center', gap:'10px', marginTop:'5px'}}>
-                        <label style={{padding:'6px 10px', border:'1px solid #cbd5e1', borderRadius:'6px', cursor:'pointer', background:'white', fontSize:'12px'}}>📎 Upload<input type="file" onChange={handleFileUpload} style={{display:'none'}} /></label>
-                        {formData.attachment_url && <a href={formData.attachment_url} target="_blank" style={{color:'#3b82f6', fontSize:'12px'}}>📄 Voir</a>}
-                    </div>
-                </div>
-                <div style={{marginTop:'auto', paddingTop:'20px', display:'flex', gap:'10px'}}>
-                     <button onClick={handleSaveMain} style={{width:'100%', padding:'10px', background:'#3b82f6', color:'white', border:'none', borderRadius:'6px', cursor:'pointer', fontWeight:'bold'}}>Enregistrer</button>
-                </div>
+                <div><label style={{fontSize:'11px', fontWeight:'bold', color:'#64748b'}}>STATUT</label><select value={formData.status||'todo'} onChange={e=>setFormData({...formData, status: e.target.value})} style={{width:'100%', padding:'8px', borderRadius:'6px', border:'1px solid #cbd5e1'}}><option value="todo">À Faire</option><option value="doing">En Cours</option><option value="done">Terminé</option></select></div>
+                <div><label style={{fontSize:'11px', fontWeight:'bold', color:'#64748b'}}>ASSIGNÉ À</label><select value={formData.assignee_id || ''} onChange={e=>setFormData({...formData, assignee_id: e.target.value})} style={{width:'100%', padding:'8px', borderRadius:'6px', border:'1px solid #cbd5e1'}}><option value="">-- Personne --</option>{projectMembers.map(m => <option key={m.id} value={m.id}>{m.username}</option>)}</select></div>
+                <div><label style={{fontSize:'11px', fontWeight:'bold', color:'#64748b'}}>ÉCHÉANCE</label><input type="date" value={formData.due_date ? formData.due_date.split('T')[0] : ''} onChange={e=>setFormData({...formData, due_date: e.target.value})} style={{width:'100%', padding:'8px', borderRadius:'6px', border:'1px solid #cbd5e1'}} /></div>
+                <div><label style={{fontSize:'11px', fontWeight:'bold', color:'#64748b'}}>PIÈCE JOINTE</label><div style={{display:'flex', alignItems:'center', gap:'10px', marginTop:'5px'}}><label style={{padding:'6px 10px', border:'1px solid #cbd5e1', borderRadius:'6px', cursor:'pointer', background:'white', fontSize:'12px'}}>📎 Upload<input type="file" onChange={handleFileUpload} style={{display:'none'}} /></label>{formData.attachment_url && <a href={formData.attachment_url} target="_blank" style={{color:'#3b82f6', fontSize:'12px'}}>📄 Voir</a>}</div></div>
+                <div style={{marginTop:'auto', paddingTop:'20px'}}><button onClick={handleSaveMain} style={{width:'100%', padding:'10px', background:'#3b82f6', color:'white', border:'none', borderRadius:'6px', cursor:'pointer', fontWeight:'bold'}}>Enregistrer</button></div>
             </div>
         </div>
       </div>
@@ -123,52 +77,203 @@ function TaskModal({ task, projectMembers, currentUser, onClose, onUpdate }) {
   );
 }
 
-// --- VUE MEMBRES (ADMIN ONLY) ---
+// --- DASHBOARD (NOUVEAU) ---
+function Dashboard({ user, onOpenProject }) {
+    const [myTasks, setMyTasks] = useState([]);
+    const [activity, setActivity] = useState([]); // Nouveau
+    const [stats, setStats] = useState({ projects: 0, pending: 0, completed: 0 });
+    const [recentProjects, setRecentProjects] = useState([]);
+
+    useEffect(() => {
+        if (!user) return;
+        fetch(`${API_URL}/users/${user.id}/tasks`).then(res=>res.json()).then(setMyTasks).catch(console.error);
+        fetch(`${API_URL}/users/${user.id}/activity`).then(res=>res.json()).then(setActivity).catch(console.error); // Nouveau
+        fetch(`${API_URL}/stats/${user.id}`).then(res=>res.json()).then(setStats).catch(console.error);
+        fetch(`${API_URL}/projects`).then(res=>res.json()).then(data => setRecentProjects(data.slice(0, 4))).catch(console.error);
+    }, [user]);
+
+    const today = new Date().toLocaleDateString('fr-FR', { weekday: 'long', year: 'numeric', month: 'long', day: 'numeric' });
+
+    return (
+        <div style={{overflowY:'auto', height:'100%', background:'#f8f9fa'}}>
+            <div className="dash-header">
+                <div className="date-sub">{today}</div>
+                <div className="greeting">Bonjour, {user.username}</div>
+                
+                {/* STATS */}
+                <div style={{display:'flex', gap:'20px', marginTop:'20px'}}>
+                    <div style={{background:'white', padding:'20px', borderRadius:'10px', border:'1px solid #e0e0e0', flex:1, textAlign:'center', boxShadow:'0 2px 5px rgba(0,0,0,0.02)'}}>
+                        <div style={{fontSize:'32px', fontWeight:'bold', color:'#333'}}>{stats.pending}</div>
+                        <div style={{fontSize:'12px', color:'#888', textTransform:'uppercase', fontWeight:'bold'}}>Tâches à faire</div>
+                    </div>
+                    <div style={{background:'white', padding:'20px', borderRadius:'10px', border:'1px solid #e0e0e0', flex:1, textAlign:'center', boxShadow:'0 2px 5px rgba(0,0,0,0.02)'}}>
+                        <div style={{fontSize:'32px', fontWeight:'bold', color:'#333'}}>{stats.projects}</div>
+                        <div style={{fontSize:'12px', color:'#888', textTransform:'uppercase', fontWeight:'bold'}}>Projets actifs</div>
+                    </div>
+                    <div style={{background:'white', padding:'20px', borderRadius:'10px', border:'1px solid #e0e0e0', flex:1, textAlign:'center', boxShadow:'0 2px 5px rgba(0,0,0,0.02)'}}>
+                        <div style={{fontSize:'32px', fontWeight:'bold', color:'#10b981'}}>{stats.completed}</div>
+                        <div style={{fontSize:'12px', color:'#888', textTransform:'uppercase', fontWeight:'bold'}}>Tâches terminées</div>
+                    </div>
+                </div>
+            </div>
+
+            <div className="dash-grid" style={{paddingBottom:'50px'}}>
+                {/* WIDGET ACTIVITÉ (REMPLIT LE VIDE) */}
+                <div className="widget-card">
+                    <div className="widget-header"><span>📢 Activité Récente de l'Hôtel</span></div>
+                    <div style={{flex:1}}>
+                        {activity.length === 0 ? <div style={{padding:'20px', textAlign:'center', color:'#888'}}>Aucune activité. Créez des tâches !</div> : 
+                            activity.map(t => (
+                                <div key={t.id} className="task-row">
+                                    <div style={{width:'30px', height:'30px', background:'#eee', borderRadius:'50%', display:'flex', alignItems:'center', justifyContent:'center', fontSize:'12px'}}>📝</div>
+                                    <div style={{flex:1}}>
+                                        <div style={{fontSize:'14px', fontWeight:'500'}}>{t.title}</div>
+                                        <div style={{fontSize:'11px', color:'#888'}}>
+                                            {t.assignee_name ? `Assigné à ${t.assignee_name}` : 'Non assigné'} • Dans <b>{t.project_name}</b>
+                                        </div>
+                                    </div>
+                                    <div style={{fontSize:'11px', color:'#aaa'}}>{new Date(t.created_at || Date.now()).toLocaleDateString()}</div>
+                                </div>
+                            ))
+                        }
+                    </div>
+                </div>
+
+                {/* WIDGET PROJETS */}
+                <div className="widget-card">
+                    <div className="widget-header"><span>📂 Projets Récents</span></div>
+                    <div style={{padding:'10px'}}>
+                        {recentProjects.map(p => (
+                            <div key={p.id} onClick={() => onOpenProject(p)} style={{padding:'10px', display:'flex', alignItems:'center', gap:'10px', cursor:'pointer', borderRadius:'6px', transition:'background 0.2s'}} onMouseOver={e=>e.currentTarget.style.background='#f5f5f5'} onMouseOut={e=>e.currentTarget.style.background='white'}>
+                                <div style={{width:'32px', height:'32px', background: '#f06a6a', borderRadius:'6px', display:'flex', alignItems:'center', justifyContent:'center', color:'white', fontSize:'14px', fontWeight:'bold'}}>{p.name.charAt(0).toUpperCase()}</div>
+                                <div style={{fontSize:'14px', fontWeight:'500'}}>{p.name}</div>
+                            </div>
+                        ))}
+                    </div>
+                </div>
+            </div>
+        </div>
+    )
+}
+
+// --- VUE PROJET ---
+function ProjectView({ project, tasks, members, viewMode, setViewMode, onAddTask, onEditTask, onUpdateTask, onInvite, user }) {
+    const [newTaskTitle, setNewTaskTitle] = useState("");
+
+    const handleDragStart = (e, taskId) => e.dataTransfer.setData("taskId", taskId);
+    const handleDragOver = (e) => e.preventDefault();
+    const handleDrop = (e, newStatus) => { const id = e.dataTransfer.getData("taskId"); const task = tasks.find(t => t.id.toString() === id); if (task && task.status !== newStatus) onUpdateTask({ ...task, status: newStatus }); };
+
+    return (
+        <div style={{padding:'30px', height:'100%', display:'flex', flexDirection:'column', background:'white'}}>
+            <div style={{display:'flex', justifyContent:'space-between', alignItems:'center', marginBottom:'20px'}}>
+                <div style={{display:'flex', alignItems:'center', gap:'15px'}}>
+                    <div style={{width:'40px', height:'40px', background:'#f06a6a', borderRadius:'8px', display:'flex', alignItems:'center', justifyContent:'center', color:'white', fontSize:'18px', fontWeight:'bold'}}>{project.name.charAt(0)}</div>
+                    <div><h1 style={{margin:0, fontSize:'20px'}}>{project.name}</h1><div style={{fontSize:'13px', color:'#888'}}>Projet • {members.length} membres</div></div>
+                </div>
+                <div style={{display:'flex', gap:'10px'}}>
+                    <div style={{background:'white', border:'1px solid #ddd', borderRadius:'6px', display:'flex', padding:'2px'}}>
+                        <button onClick={()=>setViewMode('board')} style={{padding:'6px 12px', border:'none', borderRadius:'4px', background: viewMode==='board'?'#eee':'white', cursor:'pointer', fontWeight: viewMode==='board'?'bold':'normal'}}>Kanban</button>
+                        <button onClick={()=>setViewMode('list')} style={{padding:'6px 12px', border:'none', borderRadius:'4px', background: viewMode==='list'?'#eee':'white', cursor:'pointer', fontWeight: viewMode==='list'?'bold':'normal'}}>Liste</button>
+                    </div>
+                    {user.role === 'admin' && <button onClick={onInvite} style={{background:'white', border:'1px solid #ddd', padding:'6px 12px', borderRadius:'6px', cursor:'pointer'}}>👤 Inviter</button>}
+                </div>
+            </div>
+
+            {/* VUE KANBAN */}
+            {viewMode === 'board' && (
+                <div style={{display:'flex', gap:'20px', overflowX:'auto', height:'100%', alignItems:'flex-start'}}>
+                    {['todo', 'doing', 'done'].map(status => (
+                        <div key={status} onDragOver={handleDragOver} onDrop={(e)=>handleDrop(e, status)} style={{minWidth:'320px', background:'#f7f8f9', borderRadius:'10px', padding:'15px', border:'1px solid #e0e0e0'}}>
+                            <div style={{fontSize:'12px', fontWeight:'bold', color:'#6d6e70', marginBottom:'15px', textTransform:'uppercase', display:'flex', justifyContent:'space-between'}}>
+                                {status === 'todo' ? 'À faire' : status === 'doing' ? 'En cours' : 'Terminé'}
+                                <span style={{background:'#eee', padding:'2px 8px', borderRadius:'10px'}}>{tasks.filter(t=>t.status===status).length}</span>
+                            </div>
+                            {status === 'todo' && user.role === 'admin' && (
+                                <form onSubmit={(e)=>{e.preventDefault(); onAddTask(newTaskTitle); setNewTaskTitle("");}} style={{marginBottom:'10px'}}>
+                                    <input placeholder="+ Ajouter une tâche" value={newTaskTitle} onChange={e=>setNewTaskTitle(e.target.value)} style={{width:'100%', padding:'10px', border:'1px solid transparent', borderRadius:'8px', outline:'none', boxShadow:'0 1px 3px rgba(0,0,0,0.05)'}} />
+                                </form>
+                            )}
+                            <div style={{display:'flex', flexDirection:'column', gap:'10px', minHeight:'100px'}}>
+                                {tasks.filter(t=>t.status===status).map(t => {
+                                    const assignee = members.find(m => m.id === t.assignee_id);
+                                    return (
+                                        <div key={t.id} draggable="true" onDragStart={(e)=>handleDragStart(e, t.id)} onClick={()=>onEditTask(t)} style={{background:'white', padding:'15px', borderRadius:'8px', boxShadow:'0 1px 2px rgba(0,0,0,0.05)', cursor:'grab', borderLeft: `3px solid ${t.priority==='high'?'#ef4444':t.priority==='medium'?'#f59e0b':'#10b981'}`}}>
+                                            <div style={{fontSize:'14px', marginBottom:'8px', fontWeight:'500'}}>{t.title}</div>
+                                            <div style={{display:'flex', justifyContent:'space-between', alignItems:'center'}}>
+                                                <span style={{fontSize:'11px', color:'#888', background:'#f0f0f0', padding:'2px 6px', borderRadius:'4px'}}>{t.due_date ? new Date(t.due_date).toLocaleDateString().slice(0,5) : '-'}</span>
+                                                {assignee && <div className="avatar" style={{width:'24px', height:'24px', borderRadius:'50%', background:'#f06a6a', color:'white', display:'flex', alignItems:'center', justifyContent:'center', fontSize:'10px', fontWeight:'bold'}}>{assignee.username.charAt(0)}</div>}
+                                            </div>
+                                        </div>
+                                    )
+                                })}
+                            </div>
+                        </div>
+                    ))}
+                </div>
+            )}
+
+            {/* VUE LISTE (CORRIGÉE) */}
+            {viewMode === 'list' && (
+                <div style={{background:'white', borderRadius:'8px', border:'1px solid #e0e0e0', overflow:'hidden'}}>
+                     <table style={{width:'100%', borderCollapse:'collapse', color:'#333'}}>
+                        <thead style={{background:'#f9f9f9', borderBottom:'1px solid #eee'}}>
+                            <tr>
+                                <th style={{padding:'12px', textAlign:'left', fontSize:'12px', color:'#666', textTransform:'uppercase'}}>Titre</th>
+                                <th style={{padding:'12px', textAlign:'left', fontSize:'12px', color:'#666', textTransform:'uppercase'}}>Statut</th>
+                                <th style={{padding:'12px', textAlign:'left', fontSize:'12px', color:'#666', textTransform:'uppercase'}}>Assigné</th>
+                                <th style={{padding:'12px', textAlign:'left', fontSize:'12px', color:'#666', textTransform:'uppercase'}}>Date</th>
+                            </tr>
+                        </thead>
+                        <tbody>
+                            {tasks.length === 0 && <tr><td colSpan="4" style={{padding:'20px', textAlign:'center', color:'#888'}}>Aucune tâche.</td></tr>}
+                            {tasks.map(t => {
+                                const assignee = members.find(m => m.id === t.assignee_id);
+                                return (
+                                    <tr key={t.id} onClick={()=>onEditTask(t)} style={{borderBottom:'1px solid #f5f5f5', cursor:'pointer', height:'45px'}}>
+                                        <td style={{padding:'12px', fontWeight:'500'}}>{t.title}</td>
+                                        <td style={{padding:'12px'}}>
+                                            <span style={{padding:'4px 10px', borderRadius:'12px', fontSize:'11px', fontWeight:'bold', background: t.status==='done'?'#dcfce7':t.status==='doing'?'#dbeafe':'#f3f4f6', color: t.status==='done'?'#166534':t.status==='doing'?'#1e40af':'#4b5563'}}>
+                                                {t.status === 'todo' ? 'À faire' : t.status === 'doing' ? 'En cours' : 'Terminé'}
+                                            </span>
+                                        </td>
+                                        <td style={{padding:'12px'}}>{assignee ? assignee.username : '-'}</td>
+                                        <td style={{padding:'12px', color:'#888'}}>{t.due_date ? new Date(t.due_date).toLocaleDateString() : ''}</td>
+                                    </tr>
+                                )
+                            })}
+                        </tbody>
+                     </table>
+                </div>
+            )}
+        </div>
+    )
+}
+
+// --- VUE MEMBRES ---
 function MembersView({ user }) {
     const [email, setEmail] = useState("");
     const [inviteLink, setInviteLink] = useState("");
-
-    const handleInvite = async (e) => {
-        e.preventDefault();
-        const res = await fetch(`${API_URL}/admin/invite`, { method:'POST', headers:{'Content-Type':'application/json'}, body:JSON.stringify({email}) });
-        const json = await res.json();
-        // On remplace le lien local par le lien du site si besoin
-        const finalLink = json.link.replace('http://localhost:5000', SITE_URL);
-        setInviteLink(finalLink);
-    };
-
-    if (user.role !== 'admin') return <div style={{padding:'40px'}}>⛔ Accès réservé à la Direction.</div>;
-
+    const handleInvite = async (e) => { e.preventDefault(); const res = await fetch(`${API_URL}/admin/invite`, { method:'POST', headers:{'Content-Type':'application/json'}, body:JSON.stringify({email}) }); const json = await res.json(); setInviteLink(json.link.replace('http://localhost:5000', 'https://medina-app.onrender.com')); };
     return (
         <div style={{padding:'40px'}}>
             <h1>Gestion des Membres</h1>
-            <p>Invitez vos collaborateurs en générant un lien unique.</p>
-            
             <div style={{background:'white', padding:'30px', borderRadius:'10px', border:'1px solid #eee', maxWidth:'500px', marginTop:'20px'}}>
                 <h3>Envoyer une invitation</h3>
                 <form onSubmit={handleInvite} style={{display:'flex', gap:'10px', flexDirection:'column'}}>
-                    <label>Email du collaborateur</label>
-                    <input type="email" value={email} onChange={e=>setEmail(e.target.value)} placeholder="employe@medina.tn" style={{padding:'10px', border:'1px solid #ccc', borderRadius:'6px'}} required />
-                    <button type="submit" style={{padding:'10px', background:'#10b981', color:'white', border:'none', borderRadius:'6px', cursor:'pointer', fontWeight:'bold'}}>Générer le lien d'invitation</button>
+                    <input type="email" value={email} onChange={e=>setEmail(e.target.value)} placeholder="Email du collaborateur" style={{padding:'10px', border:'1px solid #ccc', borderRadius:'6px'}} required />
+                    <button type="submit" style={{padding:'10px', background:'#10b981', color:'white', border:'none', borderRadius:'6px', cursor:'pointer', fontWeight:'bold'}}>Générer le lien</button>
                 </form>
-
-                {inviteLink && (
-                    <div style={{marginTop:'20px', background:'#f0fdf4', padding:'15px', borderRadius:'6px', border:'1px solid #bbf7d0'}}>
-                        <div style={{fontWeight:'bold', color:'#166534', marginBottom:'5px'}}>✅ Lien généré !</div>
-                        <div style={{fontSize:'12px', marginBottom:'10px'}}>Copiez ce lien et envoyez-le par WhatsApp ou Email :</div>
-                        <input readOnly value={inviteLink} style={{width:'100%', padding:'10px', border:'1px solid #ccc', borderRadius:'4px', background:'white'}} />
-                    </div>
-                )}
+                {inviteLink && <div style={{marginTop:'20px', background:'#f0fdf4', padding:'15px', borderRadius:'6px', border:'1px solid #bbf7d0'}}><div style={{fontWeight:'bold', color:'#166534'}}>Lien généré :</div><input readOnly value={inviteLink} style={{width:'100%', padding:'10px', border:'1px solid #ccc', borderRadius:'4px', marginTop:'5px'}} /></div>}
             </div>
         </div>
     );
 }
 
-// --- APP PRINCIPALE ---
+// --- APP ---
 export default function App() {
   const [token, setToken] = useState(localStorage.getItem('hotel_token'));
   const [user, setUser] = useState(() => { const s = localStorage.getItem('hotel_user'); return s ? JSON.parse(s) : null; });
-  
   const [sites, setSites] = useState([]);
   const [projects, setProjects] = useState([]);
   const [activeTab, setActiveTab] = useState('home');
@@ -177,50 +282,27 @@ export default function App() {
   const [viewMode, setViewMode] = useState('board');
   const [editingTask, setEditingTask] = useState(null);
 
-  // Login/Logout
   const handleLogin = (tok, usr) => { setToken(tok); setUser(usr); localStorage.setItem('hotel_token', tok); localStorage.setItem('hotel_user', JSON.stringify(usr)); };
   const handleLogout = () => { setToken(null); setUser(null); localStorage.removeItem('hotel_token'); localStorage.removeItem('hotel_user'); };
 
-  useEffect(() => {
-    if (token) {
-        Promise.all([fetch(`${API_URL}/sites`).then(res=>res.json()), fetch(`${API_URL}/projects`).then(res=>res.json())])
-        .then(([s, p]) => { setSites(s); setProjects(p); }).catch(e=>console.error(e));
-    }
-  }, [token]);
-
-  useEffect(() => {
-    if (selectedProject) {
-        Promise.all([fetch(`${API_URL}/tasks/${selectedProject.id}`).then(res=>res.json()), fetch(`${API_URL}/projects/${selectedProject.id}/members`).then(res=>res.json())])
-        .then(([t, m]) => { setProjectData({ tasks: t, members: m }); });
-    }
-  }, [selectedProject]);
+  useEffect(() => { if (token) { Promise.all([fetch(`${API_URL}/sites`).then(r=>r.json()), fetch(`${API_URL}/projects`).then(r=>r.json())]).then(([s, p]) => { setSites(s); setProjects(p); }); } }, [token]);
+  useEffect(() => { if (selectedProject) { Promise.all([fetch(`${API_URL}/tasks/${selectedProject.id}`).then(r=>r.json()), fetch(`${API_URL}/projects/${selectedProject.id}/members`).then(r=>r.json())]).then(([t, m]) => { setProjectData({ tasks: t, members: m }); }); } }, [selectedProject]);
 
   const navToProject = (p) => { setSelectedProject(p); setActiveTab(`project-${p.id}`); };
   const createTask = async (title) => { const res = await fetch(`${API_URL}/tasks`, { method:'POST', headers:{'Content-Type':'application/json'}, body:JSON.stringify({project_id: selectedProject.id, title})}); const t = await res.json(); setProjectData({...projectData, tasks: [...projectData.tasks, t]}); };
   const updateTask = async (uT) => { setProjectData(prev => ({ ...prev, tasks: prev.tasks.map(t => t.id === uT.id ? uT : t) })); await fetch(`${API_URL}/tasks/${uT.id}`, { method: 'PUT', headers: {'Content-Type': 'application/json'}, body: JSON.stringify(uT) }); };
 
-  // Drag & Drop
-  const handleDragStart = (e, id) => e.dataTransfer.setData("taskId", id);
-  const handleDragOver = (e) => e.preventDefault();
-  const handleDrop = (e, status) => { const id = e.dataTransfer.getData("taskId"); const task = projectData.tasks.find(t => t.id.toString() === id); if (task && task.status !== status) updateTask({ ...task, status }); };
-
+  if (token && !user) { handleLogout(); return <Login onLogin={handleLogin} />; }
   if (!token) return <Login onLogin={handleLogin} />;
 
   return (
     <div style={{display:'flex', height:'100vh', width:'100vw'}}>
         {editingTask && <TaskModal task={editingTask} projectMembers={projectData.members} currentUser={user} onClose={()=>setEditingTask(null)} onUpdate={updateTask} />}
-
-        {/* SIDEBAR */}
         <div className="sidebar" style={{width:'240px', flexShrink:0}}>
             <div className="sidebar-header"><span style={{background:'#f06a6a', width:'24px', height:'24px', borderRadius:'6px', display:'inline-block', marginRight:'10px'}}></span>MedinaOS</div>
             <div className="sidebar-section">Général</div>
             <div className={`nav-item ${activeTab==='home'?'active':''}`} onClick={()=>{setActiveTab('home'); setSelectedProject(null)}}>🏠 Accueil</div>
-            
-            {/* BOUTON MEMBRES (ADMIN SEULEMENT) */}
-            {user.role === 'admin' && (
-                <div className={`nav-item ${activeTab==='members'?'active':''}`} onClick={()=>{setActiveTab('members'); setSelectedProject(null)}}>👥 Membres</div>
-            )}
-
+            {user.role === 'admin' && <div className={`nav-item ${activeTab==='members'?'active':''}`} onClick={()=>{setActiveTab('members'); setSelectedProject(null)}}>👥 Membres</div>}
             {sites.map(site => {
                 const sp = projects.filter(p => p.site_id === site.id);
                 if (sp.length === 0) return null;
@@ -237,55 +319,11 @@ export default function App() {
             })}
             <div style={{marginTop:'auto', padding:'20px'}}><button onClick={handleLogout} style={{background:'transparent', border:'1px solid #444', color:'#aaa', width:'100%', padding:'8px', borderRadius:'6px', cursor:'pointer'}}>Déconnexion</button></div>
         </div>
-
-        {/* MAIN CONTENT */}
         <div style={{flex:1, overflow:'hidden', background:'white'}}>
-            {activeTab === 'home' && <div style={{padding:'40px'}}><h1>Bienvenue {user.username}</h1></div>}
-            
-            {/* VUE MEMBRES */}
+            {activeTab === 'home' && <Dashboard user={user} onOpenProject={navToProject} />}
             {activeTab === 'members' && <MembersView user={user} />}
-
-            {/* VUE PROJET */}
             {activeTab.startsWith('project-') && selectedProject && (
-                <div style={{padding:'30px', height:'100%', display:'flex', flexDirection:'column', background:'white'}}>
-                    <div style={{display:'flex', justifyContent:'space-between', alignItems:'center', marginBottom:'20px'}}>
-                        <h1 style={{margin:0}}>{selectedProject.name}</h1>
-                        <div style={{display:'flex', gap:'10px'}}>
-                             {/* BOUTON VUES */}
-                            <div style={{background:'white', border:'1px solid #ddd', borderRadius:'6px', display:'flex', padding:'2px'}}>
-                                <button onClick={()=>setViewMode('board')} style={{padding:'6px 12px', border:'none', background:viewMode==='board'?'#eee':'white', cursor:'pointer'}}>Kanban</button>
-                                <button onClick={()=>setViewMode('list')} style={{padding:'6px 12px', border:'none', background:viewMode==='list'?'#eee':'white', cursor:'pointer'}}>Liste</button>
-                            </div>
-                        </div>
-                    </div>
-
-                    {/* VUE KANBAN */}
-                    {viewMode === 'board' && (
-                        <div style={{display:'flex', gap:'20px', overflowX:'auto', height:'100%', alignItems:'flex-start'}}>
-                            {['todo', 'doing', 'done'].map(status => (
-                                <div key={status} onDragOver={handleDragOver} onDrop={(e)=>handleDrop(e, status)} style={{minWidth:'320px', background:'#f7f8f9', borderRadius:'10px', padding:'15px', border:'1px solid #e0e0e0'}}>
-                                    <div style={{fontWeight:'bold', color:'#6d6e70', marginBottom:'15px', textTransform:'uppercase'}}>{status}</div>
-                                    
-                                    {/* INPUT CREATION (ADMIN SEULEMENT) */}
-                                    {status === 'todo' && user.role === 'admin' && (
-                                        <form onSubmit={(e)=>{e.preventDefault(); const t=e.target.elements[0].value; if(t) createTask(t); e.target.reset();}} style={{marginBottom:'10px'}}>
-                                            <input placeholder="+ Tâche (Admin)" style={{width:'100%', padding:'10px', border:'1px solid transparent', borderRadius:'8px', boxShadow:'0 1px 3px rgba(0,0,0,0.05)'}} />
-                                        </form>
-                                    )}
-
-                                    <div style={{display:'flex', flexDirection:'column', gap:'10px'}}>
-                                        {projectData.tasks.filter(t=>t.status===status).map(t => (
-                                            <div key={t.id} draggable="true" onDragStart={(e)=>handleDragStart(e, t.id)} onClick={()=>setEditingTask(t)} style={{background:'white', padding:'15px', borderRadius:'8px', boxShadow:'0 1px 2px rgba(0,0,0,0.05)', cursor:'grab', borderLeft: `3px solid ${t.priority==='high'?'#ef4444':'transparent'}`}}>
-                                                <div style={{fontWeight:'500'}}>{t.title}</div>
-                                                <div style={{fontSize:'12px', color:'#888', marginTop:'5px'}}>{t.due_date ? new Date(t.due_date).toLocaleDateString() : ''}</div>
-                                            </div>
-                                        ))}
-                                    </div>
-                                </div>
-                            ))}
-                        </div>
-                    )}
-                </div>
+                <ProjectView project={selectedProject} tasks={projectData.tasks} members={projectData.members} viewMode={viewMode} setViewMode={setViewMode} onAddTask={createTask} onEditTask={setEditingTask} onUpdateTask={updateTask} onInvite={()=>setActiveTab('members')} user={user} />
             )}
         </div>
     </div>
