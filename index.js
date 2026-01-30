@@ -406,6 +406,40 @@ app.delete('/subtasks/:id', async (req, res) => {
     res.json({ message: "Supprimé" });
 });
 
+// --- DASHBOARD DATA ---
+
+// 1. Récupérer les tâches assignées à un utilisateur spécifique (Pour le widget "Mes Tâches")
+app.get('/users/:userId/tasks', async (req, res) => {
+    try {
+        const { userId } = req.params;
+        // On récupère les tâches non terminées assignées à l'utilisateur
+        const tasks = await pool.query(`
+            SELECT t.*, p.name as project_name 
+            FROM tasks t 
+            JOIN projects p ON t.project_id = p.id 
+            WHERE t.assignee_id = $1 AND t.status != 'done'
+            ORDER BY t.due_date ASC NULLS LAST
+        `, [userId]);
+        res.json(tasks.rows);
+    } catch (err) { res.status(500).send(err.message); }
+});
+
+// 2. Récupérer des statistiques globales (Pour les widgets)
+app.get('/stats/:userId', async (req, res) => {
+    try {
+        const { userId } = req.params;
+        const totalProjects = await pool.query("SELECT COUNT(*) FROM projects WHERE owner_id = $1", [userId]);
+        const pendingTasks = await pool.query("SELECT COUNT(*) FROM tasks WHERE assignee_id = $1 AND status != 'done'", [userId]);
+        const completedTasks = await pool.query("SELECT COUNT(*) FROM tasks WHERE assignee_id = $1 AND status = 'done'", [userId]);
+        
+        res.json({
+            projects: totalProjects.rows[0].count,
+            pending: pendingTasks.rows[0].count,
+            completed: completedTasks.rows[0].count
+        });
+    } catch (err) { res.status(500).send(err.message); }
+});
+
 
 app.listen(PORT, () => {
     console.log(`Serveur démarré sur http://localhost:${PORT}`);
