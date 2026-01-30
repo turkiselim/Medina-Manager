@@ -1,7 +1,7 @@
 import { useEffect, useState, useRef } from 'react'
 import Login from './Login'
 
-const API_URL = 'https://medina-api.onrender.com'; // <--- VÉRIFIEZ VOTRE URL !
+const API_URL = 'https://medina-api.onrender.com'; // <--- VÉRIFIEZ VOTRE URL ICI !
 
 // --- STYLE CSS INTELLIGENT (PC & MOBILE) ---
 const styles = `
@@ -142,7 +142,7 @@ function Dashboard({ user }) {
         fetch(sUrl)
             .then(r => { if(!r.ok) throw new Error("Stats HS"); return r.json(); })
             .then(setStats)
-            .catch(() => setError("Veuillez mettre à jour le serveur (server/index.js)"));
+            .catch(() => setError("Veuillez mettre à jour server/index.js"));
             
         fetch(aUrl).then(r=>r.json()).then(setActivity).catch(console.error);
     }, [user]);
@@ -215,7 +215,42 @@ function MembersView({ user }) {
     );
 }
 
-// --- VUE PROJET (KANBAN RÉPARÉ) ---
+// --- VUE CORBEILLE (SÉCURISÉE) ---
+function TrashView() {
+    const [items, setItems] = useState([]);
+    const [error, setError] = useState(null);
+
+    const loadTrash = () => {
+        fetch(`${API_URL}/trash`)
+            .then(r => { if (!r.ok) throw new Error("Erreur serveur"); return r.json(); })
+            .then(data => { if (Array.isArray(data)) setItems(data); else setItems([]); })
+            .catch(err => { console.error(err); setError("Impossible de charger la corbeille."); });
+    };
+
+    useEffect(() => { loadTrash(); }, []);
+
+    const handleRestore = async (type, id) => { await fetch(`${API_URL}/restore/${type}/${id}`, { method:'PUT' }); loadTrash(); };
+    const handlePermanentDelete = async (type, id) => { if(!confirm("ATTENTION : Irréversible. Continuer ?")) return; await fetch(`${API_URL}/permanent/${type}/${id}`, { method:'DELETE' }); loadTrash(); };
+
+    if (error) return <div style={{padding:'40px', color:'red'}}>⚠️ {error}</div>;
+
+    return (
+        <div style={{padding:'40px'}}>
+            <h1 style={{color:'#ef4444'}}>🗑️ Corbeille</h1>
+            <div style={{marginTop:'20px', background:'white', borderRadius:'10px', border:'1px solid #eee', overflow:'hidden'}}>
+                {items.length === 0 && <div style={{padding:'40px', textAlign:'center', color:'#888'}}>Corbeille vide.</div>}
+                {items.map((item, idx) => (
+                    <div key={idx} style={{display:'flex', justifyContent:'space-between', alignItems:'center', padding:'15px 20px', borderBottom:'1px solid #f0f0f0'}}>
+                        <div><span style={{fontWeight:'bold'}}>{item.title}</span> <span style={{fontSize:'10px', background:'#eee', padding:'2px 6px', borderRadius:'4px'}}>{item.type}</span></div>
+                        <div><button onClick={()=>handleRestore(item.type, item.id)} style={{background:'#10b981', color:'white', border:'none', padding:'6px', borderRadius:'4px', marginRight:'5px'}}>♻️</button><button onClick={()=>handlePermanentDelete(item.type, item.id)} style={{background:'#fee2e2', color:'red', border:'none', padding:'6px', borderRadius:'4px'}}>☠️</button></div>
+                    </div>
+                ))}
+            </div>
+        </div>
+    )
+}
+
+// --- VUE PROJET ---
 function ProjectView({ project, tasks, members, allUsers, viewMode, setViewMode, onAddTask, onEditTask, onUpdateTask, onInvite, onDeleteProject, user }) {
     const [newTaskTitle, setNewTaskTitle] = useState("");
     const handleDragStart = (e, taskId) => e.dataTransfer.setData("taskId", taskId);
