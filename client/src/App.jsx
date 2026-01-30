@@ -1,7 +1,7 @@
 import { useEffect, useState } from 'react'
 import Login from './Login'
 
-const API_URL = 'https://medina-api-xxxx.onrender.com'; // <--- VOTRE URL RENDER
+const API_URL = 'https://medina-api.onrender.com'; // <--- VOTRE URL RENDER
 
 // --- VUE CORBEILLE (NOUVEAU) ---
 function TrashView() {
