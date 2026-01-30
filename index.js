@@ -121,4 +121,33 @@ app.get('/stats/:userId', async (req, res) => { const tp = await pool.query("SEL
 app.get('/update-db-v8', async (req, res) => { try { await pool.query("ALTER TABLE sites ADD COLUMN IF NOT EXISTS deleted_at TIMESTAMP DEFAULT NULL"); await pool.query("ALTER TABLE projects ADD COLUMN IF NOT EXISTS deleted_at TIMESTAMP DEFAULT NULL"); await pool.query("ALTER TABLE tasks ADD COLUMN IF NOT EXISTS deleted_at TIMESTAMP DEFAULT NULL"); res.send("Update V8 OK"); } catch (e) { res.status(500).send(e.message); } });
 
 const PORT = process.env.PORT || 5000;
+
+// --- GESTION RH (MEMBRES) ---
+
+// 1. Lister tout le personnel
+app.get('/users', async (req, res) => {
+    try {
+        // On récupère tout sauf le mot de passe (sécurité)
+        const users = await pool.query("SELECT id, username, email, role, created_at FROM users ORDER BY id ASC");
+        res.json(users.rows);
+    } catch (err) { res.status(500).send(err.message); }
+});
+
+// 2. Changer le grade d'un employé (Promotion/Rétrogradation)
+app.put('/users/:id/role', async (req, res) => {
+    const { role } = req.body; // 'admin' ou 'member'
+    try {
+        await pool.query("UPDATE users SET role = $1 WHERE id = $2", [role, req.params.id]);
+        res.json({ success: true });
+    } catch (err) { res.status(500).send(err.message); }
+});
+
+// 3. Renvoyer un employé (Suppression de compte)
+app.delete('/users/:id', async (req, res) => {
+    try {
+        await pool.query("DELETE FROM users WHERE id = $1", [req.params.id]);
+        res.json({ success: true });
+    } catch (err) { res.status(500).send(err.message); }
+});
+
 app.listen(PORT, () => console.log(`Server started on ${PORT}`));
