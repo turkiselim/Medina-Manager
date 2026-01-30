@@ -32,7 +32,8 @@ function TrashView() {
 }
 
 // --- MODALE TÂCHE ---
-function TaskModal({ task, projectMembers, currentUser, onClose, onUpdate, onDelete }) {
+// --- MODALE TÂCHE (CORRIGÉE : Liste Global Staff) ---
+function TaskModal({ task, allUsers, currentUser, onClose, onUpdate, onDelete }) {
   const [formData, setFormData] = useState(task);
   const [subtasks, setSubtasks] = useState([]);
   const [comments, setComments] = useState([]);
@@ -63,26 +64,41 @@ function TaskModal({ task, projectMembers, currentUser, onClose, onUpdate, onDel
         </div>
         <div style={{display:'flex', flex:1, overflow:'hidden'}}>
             <div style={{flex:2, padding:'25px', overflowY:'auto', borderRight:'1px solid #e2e8f0'}}>
-                <textarea value={formData.description||''} onChange={e=>setFormData({...formData, description:e.target.value})} rows="3" style={{width:'100%', padding:'10px', marginBottom:'20px', border:'1px solid #e2e8f0', borderRadius:'6px'}} placeholder="Description..." />
-                <div style={{background:'#f8fafc', padding:'15px', borderRadius:'8px', marginBottom:'20px'}}>
-                    <label style={{fontWeight:'bold', display:'block', marginBottom:'10px'}}>✅ Sous-tâches</label>
-                    {subtasks.map(st => (<div key={st.id} style={{display:'flex', alignItems:'center', gap:'10px', padding:'5px 0'}}><input type="checkbox" checked={st.is_completed} onChange={(e)=>updateSubtask({...st, is_completed:e.target.checked})} /><input value={st.title} onChange={(e)=>updateSubtask({...st, title:e.target.value})} style={{border:'none', background:'transparent', flex:1}} /><button onClick={()=>deleteSubtask(st.id)} style={{border:'none', color:'#ef4444', cursor:'pointer'}}>×</button></div>))}
-                    <form onSubmit={addSubtask}><input placeholder="+ Étape" value={newSubtaskTitle} onChange={e=>setNewSubtaskTitle(e.target.value)} style={{width:'100%', padding:'5px', marginTop:'5px'}} /></form>
+                <label style={{fontSize:'12px', fontWeight:'bold', color:'#94a3b8', textTransform:'uppercase'}}>Description</label>
+                <textarea value={formData.description||''} onChange={e=>setFormData({...formData, description:e.target.value})} rows="3" style={{width:'100%', padding:'10px', marginTop:'8px', marginBottom:'20px', border:'1px solid #e2e8f0', borderRadius:'6px'}} placeholder="Détails..." />
+                
+                <div style={{background:'#f8fafc', padding:'15px', borderRadius:'8px', border:'1px solid #e2e8f0', marginBottom:'20px'}}>
+                    <label style={{fontWeight:'bold', color:'#475569', display:'block', marginBottom:'10px'}}>✅ Sous-tâches</label>
+                    {subtasks.map(st => (<div key={st.id} style={{display:'flex', alignItems:'center', gap:'10px', padding:'5px 0'}}><input type="checkbox" checked={st.is_completed} onChange={(e)=>updateSubtask({...st, is_completed:e.target.checked})} style={{cursor:'pointer'}}/><input value={st.title} onChange={(e)=>updateSubtask({...st, title:e.target.value})} style={{border:'none', background:'transparent', flex:1, textDecoration: st.is_completed?'line-through':'none', color: st.is_completed?'#94a3b8':'inherit'}} /><button onClick={()=>deleteSubtask(st.id)} style={{border:'none', background:'transparent', color:'#ef4444', cursor:'pointer'}}>×</button></div>))}
+                    <form onSubmit={addSubtask}><input placeholder="+ Étape" value={newSubtaskTitle} onChange={e=>setNewSubtaskTitle(e.target.value)} style={{width:'100%', padding:'5px', border:'1px solid #cbd5e1', borderRadius:'4px', marginTop:'5px'}} /></form>
                 </div>
+
                 <div>
-                    <label style={{fontWeight:'bold', display:'block', marginBottom:'10px'}}>💬 Commentaires</label>
+                    <label style={{fontWeight:'bold', color:'#475569', display:'block', marginBottom:'10px'}}>💬 Commentaires</label>
                     <div style={{background:'#f1f5f9', padding:'15px', borderRadius:'8px', maxHeight:'200px', overflowY:'auto', marginBottom:'10px'}}>
-                        {comments.map(c => (<div key={c.id} style={{marginBottom:'10px', background:'white', padding:'8px', borderRadius:'6px'}}><div style={{fontSize:'11px', fontWeight:'bold', color:'#3b82f6'}}>{c.username}</div><div>{c.content}</div></div>))}
+                        {comments.map(c => (<div key={c.id} style={{marginBottom:'10px', background:'white', padding:'8px', borderRadius:'6px', boxShadow:'0 1px 2px rgba(0,0,0,0.05)'}}><div style={{fontSize:'11px', fontWeight:'bold', color:'#3b82f6', marginBottom:'2px'}}>{c.username} <span style={{color:'#aaa', fontWeight:'normal'}}>{new Date(c.created_at).toLocaleString()}</span></div><div style={{fontSize:'13px'}}>{c.content}</div></div>))}
                     </div>
-                    <form onSubmit={sendComment} style={{display:'flex', gap:'10px'}}><input value={newComment} onChange={e=>setNewComment(e.target.value)} placeholder="Commentaire..." style={{flex:1, padding:'8px'}} /><button type="submit" style={{background:'#3b82f6', color:'white', border:'none', padding:'0 15px', borderRadius:'6px'}}>Envoyer</button></form>
+                    <form onSubmit={sendComment} style={{display:'flex', gap:'10px'}}><input value={newComment} onChange={e=>setNewComment(e.target.value)} placeholder="Écrire un commentaire..." style={{flex:1, padding:'8px', borderRadius:'6px', border:'1px solid #cbd5e1'}} /><button type="submit" style={{background:'#3b82f6', color:'white', border:'none', padding:'0 15px', borderRadius:'6px', cursor:'pointer'}}>Envoyer</button></form>
                 </div>
             </div>
             <div style={{flex:1, padding:'25px', background:'#f9fafb', display:'flex', flexDirection:'column', gap:'15px'}}>
-                <div><label>STATUT</label><select value={formData.status||'todo'} onChange={e=>setFormData({...formData, status: e.target.value})} style={{width:'100%', padding:'8px'}}><option value="todo">À Faire</option><option value="doing">En Cours</option><option value="done">Terminé</option></select></div>
-                <div><label>ASSIGNÉ À</label><select value={formData.assignee_id || ''} onChange={e=>setFormData({...formData, assignee_id: e.target.value})} style={{width:'100%', padding:'8px'}}><option value="">-- Personne --</option>{projectMembers.map(m => <option key={m.id} value={m.id}>{m.username}</option>)}</select></div>
-                <div><label>ÉCHÉANCE</label><input type="date" value={formData.due_date ? formData.due_date.split('T')[0] : ''} onChange={e=>setFormData({...formData, due_date: e.target.value})} style={{width:'100%', padding:'8px'}} /></div>
-                <div><label>PIÈCE JOINTE</label><div style={{marginTop:'5px'}}><label style={{padding:'5px', border:'1px solid #ccc', cursor:'pointer', background:'white'}}>📎 Upload<input type="file" onChange={handleFileUpload} style={{display:'none'}} /></label>{formData.attachment_url && <a href={formData.attachment_url} target="_blank" style={{marginLeft:'10px', color:'#3b82f6'}}>Voir</a>}</div></div>
-                <div style={{marginTop:'auto'}}><button onClick={handleSaveMain} style={{width:'100%', padding:'10px', background:'#3b82f6', color:'white', border:'none', borderRadius:'6px'}}>Enregistrer</button></div>
+                <div><label style={{fontSize:'11px', fontWeight:'bold', color:'#64748b'}}>STATUT</label><select value={formData.status||'todo'} onChange={e=>setFormData({...formData, status: e.target.value})} style={{width:'100%', padding:'8px', borderRadius:'6px', border:'1px solid #cbd5e1'}}><option value="todo">À Faire</option><option value="doing">En Cours</option><option value="done">Terminé</option></select></div>
+                
+                {/* --- CHANGEMENT ICI : UTILISATION DE LA LISTE GLOBALE 'allUsers' --- */}
+                <div>
+                    <label style={{fontSize:'11px', fontWeight:'bold', color:'#64748b'}}>ASSIGNÉ À</label>
+                    <select value={formData.assignee_id || ''} onChange={e=>setFormData({...formData, assignee_id: e.target.value})} style={{width:'100%', padding:'8px', borderRadius:'6px', border:'1px solid #cbd5e1'}}>
+                        <option value="">-- Personne --</option>
+                        {allUsers.map(m => (
+                            <option key={m.id} value={m.id}>{m.username} ({m.email})</option>
+                        ))}
+                    </select>
+                </div>
+
+                <div><label style={{fontSize:'11px', fontWeight:'bold', color:'#64748b'}}>ÉCHÉANCE</label><input type="date" value={formData.due_date ? formData.due_date.split('T')[0] : ''} onChange={e=>setFormData({...formData, due_date: e.target.value})} style={{width:'100%', padding:'8px', borderRadius:'6px', border:'1px solid #cbd5e1'}} /></div>
+                <div><label style={{fontSize:'11px', fontWeight:'bold', color:'#64748b'}}>PRIORITÉ</label><select value={formData.priority||'medium'} onChange={e=>setFormData({...formData, priority:e.target.value})} style={{width:'100%', padding:'8px', borderRadius:'6px', border:'1px solid #cbd5e1'}}><option value="low">🟢 Basse</option><option value="medium">🟡 Moyenne</option><option value="high">🔴 Haute</option></select></div>
+                <div><label style={{fontSize:'11px', fontWeight:'bold', color:'#64748b'}}>PIÈCE JOINTE</label><div style={{display:'flex', alignItems:'center', gap:'10px', marginTop:'5px'}}><label style={{padding:'6px 10px', border:'1px solid #cbd5e1', borderRadius:'6px', cursor:'pointer', background:'white', fontSize:'12px'}}>📎 Upload<input type="file" onChange={handleFileUpload} style={{display:'none'}} /></label>{formData.attachment_url && <a href={formData.attachment_url} target="_blank" style={{color:'#3b82f6', fontSize:'12px'}}>📄 Voir</a>}</div></div>
+                <div style={{marginTop:'auto', paddingTop:'20px'}}><button onClick={handleSaveMain} style={{width:'100%', padding:'10px', background:'#3b82f6', color:'white', border:'none', borderRadius:'6px', cursor:'pointer', fontWeight:'bold'}}>Enregistrer</button></div>
             </div>
         </div>
       </div>
@@ -134,35 +150,56 @@ function Dashboard({ user, onOpenProject }) {
     )
 }
 
-// --- VUE PROJET ---
-function ProjectView({ project, tasks, members, viewMode, setViewMode, onAddTask, onEditTask, onUpdateTask, onInvite, onDeleteProject, user }) {
+// --// --- VUE PROJET (Corrigée pour passer allUsers) ---
+function ProjectView({ project, tasks, members, allUsers, viewMode, setViewMode, onAddTask, onEditTask, onUpdateTask, onInvite, onDeleteProject, user }) {
     const [newTaskTitle, setNewTaskTitle] = useState("");
     const handleDragStart = (e, taskId) => e.dataTransfer.setData("taskId", taskId);
     const handleDragOver = (e) => e.preventDefault();
     const handleDrop = (e, newStatus) => { const id = e.dataTransfer.getData("taskId"); const task = tasks.find(t => t.id.toString() === id); if (task && task.status !== newStatus) onUpdateTask({ ...task, status: newStatus }); };
 
+    // Helper pour trouver le nom d'un user depuis la liste globale
+    const getUserName = (id) => {
+        const u = allUsers.find(u => u.id === id);
+        return u ? u.username : '-';
+    };
+
     return (
         <div style={{padding:'30px', height:'100%', display:'flex', flexDirection:'column', background:'white'}}>
             <div style={{display:'flex', justifyContent:'space-between', alignItems:'center', marginBottom:'20px'}}>
-                <h1>{project.name}</h1>
+                <div style={{display:'flex', alignItems:'center', gap:'15px'}}>
+                    <div style={{width:'40px', height:'40px', background:'#f06a6a', borderRadius:'8px', display:'flex', alignItems:'center', justifyContent:'center', color:'white', fontSize:'18px', fontWeight:'bold'}}>{project.name.charAt(0)}</div>
+                    <div><h1 style={{margin:0, fontSize:'20px'}}>{project.name}</h1><div style={{fontSize:'13px', color:'#888'}}>Projet</div></div>
+                </div>
                 <div style={{display:'flex', gap:'10px'}}>
-                    <button onClick={()=>setViewMode('board')} style={{padding:'6px 12px'}}>Kanban</button>
-                    <button onClick={()=>setViewMode('list')} style={{padding:'6px 12px'}}>Liste</button>
-                    {user.role === 'admin' && <button onClick={onInvite} style={{background:'#f3f4f6', border:'1px solid #ddd', padding:'6px 12px'}}>Inviter</button>}
-                    {user.role === 'admin' && <button onClick={()=>onDeleteProject(project.id)} style={{background:'#fee2e2', color:'red', border:'none', padding:'6px 12px'}}>Supprimer</button>}
+                    <div style={{background:'white', border:'1px solid #ddd', borderRadius:'6px', display:'flex', padding:'2px'}}>
+                        <button onClick={()=>setViewMode('board')} style={{padding:'6px 12px', border:'none', borderRadius:'4px', background: viewMode==='board'?'#eee':'white', cursor:'pointer', fontWeight: viewMode==='board'?'bold':'normal'}}>Kanban</button>
+                        <button onClick={()=>setViewMode('list')} style={{padding:'6px 12px', border:'none', borderRadius:'4px', background: viewMode==='list'?'#eee':'white', cursor:'pointer', fontWeight: viewMode==='list'?'bold':'normal'}}>Liste</button>
+                    </div>
+                    {user.role === 'admin' && <button onClick={()=>onDeleteProject(project.id)} style={{background:'#fee2e2', color:'#ef4444', border:'none', padding:'6px 12px', borderRadius:'6px', cursor:'pointer'}}>🗑️ Supprimer</button>}
                 </div>
             </div>
 
             {viewMode === 'board' && (
                 <div style={{display:'flex', gap:'20px', overflowX:'auto', height:'100%', alignItems:'flex-start'}}>
                     {['todo', 'doing', 'done'].map(status => (
-                        <div key={status} onDragOver={handleDragOver} onDrop={(e)=>handleDrop(e, status)} style={{minWidth:'300px', background:'#f7f8f9', borderRadius:'10px', padding:'15px'}}>
-                            <div style={{fontWeight:'bold', marginBottom:'15px', textTransform:'uppercase'}}>{status}</div>
-                            {status === 'todo' && user.role === 'admin' && <form onSubmit={(e)=>{e.preventDefault(); onAddTask(newTaskTitle); setNewTaskTitle("");}}><input placeholder="+ Tâche" value={newTaskTitle} onChange={e=>setNewTaskTitle(e.target.value)} style={{width:'100%', padding:'10px', marginBottom:'10px'}} /></form>}
+                        <div key={status} onDragOver={handleDragOver} onDrop={(e)=>handleDrop(e, status)} style={{minWidth:'320px', background:'#f7f8f9', borderRadius:'10px', padding:'15px', border:'1px solid #e0e0e0'}}>
+                            <div style={{fontSize:'12px', fontWeight:'bold', color:'#6d6e70', marginBottom:'15px', textTransform:'uppercase', display:'flex', justifyContent:'space-between'}}>
+                                {status === 'todo' ? 'À faire' : status === 'doing' ? 'En cours' : 'Terminé'}
+                                <span style={{background:'#eee', padding:'2px 8px', borderRadius:'10px'}}>{tasks.filter(t=>t.status===status).length}</span>
+                            </div>
+                            {status === 'todo' && user.role === 'admin' && (
+                                <form onSubmit={(e)=>{e.preventDefault(); onAddTask(newTaskTitle); setNewTaskTitle("");}} style={{marginBottom:'10px'}}>
+                                    <input placeholder="+ Ajouter une tâche" value={newTaskTitle} onChange={e=>setNewTaskTitle(e.target.value)} style={{width:'100%', padding:'10px', border:'1px solid transparent', borderRadius:'8px', outline:'none', boxShadow:'0 1px 3px rgba(0,0,0,0.05)'}} />
+                                </form>
+                            )}
                             <div style={{display:'flex', flexDirection:'column', gap:'10px'}}>
                                 {tasks.filter(t=>t.status===status).map(t => (
-                                    <div key={t.id} draggable="true" onDragStart={(e)=>handleDragStart(e, t.id)} onClick={()=>onEditTask(t)} style={{background:'white', padding:'15px', borderRadius:'8px', boxShadow:'0 1px 2px rgba(0,0,0,0.05)', cursor:'grab'}}>
-                                        {t.title}
+                                    <div key={t.id} draggable="true" onDragStart={(e)=>handleDragStart(e, t.id)} onClick={()=>onEditTask(t)} style={{background:'white', padding:'15px', borderRadius:'8px', boxShadow:'0 1px 2px rgba(0,0,0,0.05)', cursor:'grab', borderLeft: `3px solid ${t.priority==='high'?'#ef4444':t.priority==='medium'?'#f59e0b':'#10b981'}`}}>
+                                        <div style={{fontSize:'14px', marginBottom:'8px', fontWeight:'500'}}>{t.title}</div>
+                                        <div style={{display:'flex', justifyContent:'space-between', alignItems:'center'}}>
+                                            <span style={{fontSize:'11px', color:'#888', background:'#f0f0f0', padding:'2px 6px', borderRadius:'4px'}}>{t.due_date ? new Date(t.due_date).toLocaleDateString().slice(0,5) : '-'}</span>
+                                            {t.assignee_id && <div className="avatar" style={{width:'24px', height:'24px', borderRadius:'50%', background:'#f06a6a', color:'white', display:'flex', alignItems:'center', justifyContent:'center', fontSize:'10px', fontWeight:'bold'}}>{getUserName(t.assignee_id).charAt(0)}</div>}
+                                        </div>
                                     </div>
                                 ))}
                             </div>
@@ -170,26 +207,29 @@ function ProjectView({ project, tasks, members, viewMode, setViewMode, onAddTask
                     ))}
                 </div>
             )}
+            
             {viewMode === 'list' && (
-                <table style={{width:'100%', borderCollapse:'collapse'}}>
-                    <thead style={{background:'#f9f9f9'}}><tr><th style={{padding:'10px', textAlign:'left'}}>Titre</th><th style={{padding:'10px', textAlign:'left'}}>Statut</th><th style={{padding:'10px', textAlign:'left'}}>Assigné</th></tr></thead>
-                    <tbody>
-                        {tasks.map(t => {
-                            const assignee = members.find(m => m.id === t.assignee_id);
-                            return (
-                                <tr key={t.id} onClick={()=>onEditTask(t)} style={{borderBottom:'1px solid #eee', cursor:'pointer'}}>
-                                    <td style={{padding:'10px'}}>{t.title}</td>
-                                    <td style={{padding:'10px'}}>{t.status}</td>
-                                    <td style={{padding:'10px'}}>{assignee ? assignee.username : '-'}</td>
+                <div style={{background:'white', borderRadius:'8px', border:'1px solid #e0e0e0', overflow:'hidden'}}>
+                     <table style={{width:'100%', borderCollapse:'collapse', color:'#333'}}>
+                        <thead style={{background:'#f9f9f9', borderBottom:'1px solid #eee'}}>
+                            <tr><th style={{padding:'12px', textAlign:'left'}}>Titre</th><th style={{padding:'12px', textAlign:'left'}}>Statut</th><th style={{padding:'12px', textAlign:'left'}}>Assigné</th></tr>
+                        </thead>
+                        <tbody>
+                            {tasks.map(t => (
+                                <tr key={t.id} onClick={()=>onEditTask(t)} style={{borderBottom:'1px solid #f5f5f5', cursor:'pointer', height:'45px'}}>
+                                    <td style={{padding:'12px', fontWeight:'500'}}>{t.title}</td>
+                                    <td style={{padding:'12px'}}>{t.status}</td>
+                                    <td style={{padding:'12px'}}>{getUserName(t.assignee_id)}</td>
                                 </tr>
-                            )
-                        })}
-                    </tbody>
-                </table>
+                            ))}
+                        </tbody>
+                     </table>
+                </div>
             )}
         </div>
     )
 }
+   
 
 // --- VUE MEMBRES (ANNUAIRE RH) ---
 function MembersView({ user }) {
@@ -304,20 +344,15 @@ function MembersView({ user }) {
     );
 }
 
-// --- APP PRINCIPALE (Avec correction de sécurité) ---
+// --- APP PRINCIPALE ---
 export default function App() {
   const [token, setToken] = useState(localStorage.getItem('hotel_token'));
+  const [user, setUser] = useState(() => { try { return JSON.parse(localStorage.getItem('hotel_user')); } catch { return null; } });
   
-  // SÉCURITÉ ANTI-CRASH JSON
-  const [user, setUser] = useState(() => {
-      try {
-          const s = localStorage.getItem('hotel_user');
-          return s && s !== "undefined" ? JSON.parse(s) : null;
-      } catch { return null; }
-  });
-
   const [sites, setSites] = useState([]);
   const [projects, setProjects] = useState([]);
+  const [allUsers, setAllUsers] = useState([]); // <--- STOCKAGE GLOBAL DES UTILISATEURS
+  
   const [activeTab, setActiveTab] = useState('home');
   const [selectedProject, setSelectedProject] = useState(null);
   const [projectData, setProjectData] = useState({ tasks: [], members: [] });
@@ -331,18 +366,29 @@ export default function App() {
   const handleLogin = (tok, usr) => { setToken(tok); setUser(usr); localStorage.setItem('hotel_token', tok); localStorage.setItem('hotel_user', JSON.stringify(usr)); };
   const handleLogout = () => { setToken(null); setUser(null); localStorage.clear(); };
 
-  const loadData = () => { Promise.all([fetch(`${API_URL}/sites`).then(r=>r.json()), fetch(`${API_URL}/projects`).then(r=>r.json())]).then(([s, p]) => { setSites(Array.isArray(s)?s:[]); setProjects(Array.isArray(p)?p:[]); }).catch(console.error); };
+  // Chargement initial (Sites, Projets ET UTILISATEURS)
+  const loadData = () => { 
+      Promise.all([
+          fetch(`${API_URL}/sites`).then(r=>r.json()), 
+          fetch(`${API_URL}/projects`).then(r=>r.json()),
+          fetch(`${API_URL}/users`).then(r=>r.json()) // <--- On charge tout le monde
+      ]).then(([s, p, u]) => { 
+          setSites(Array.isArray(s)?s:[]); 
+          setProjects(Array.isArray(p)?p:[]);
+          setAllUsers(Array.isArray(u)?u:[]); // <--- On stocke
+      }).catch(console.error); 
+  };
+  
   useEffect(() => { if (token) loadData(); }, [token]);
+
   useEffect(() => { if (selectedProject) { Promise.all([fetch(`${API_URL}/tasks/${selectedProject.id}`).then(r=>r.json()), fetch(`${API_URL}/projects/${selectedProject.id}/members`).then(r=>r.json())]).then(([t, m]) => { setProjectData({ tasks: Array.isArray(t)?t:[], members: Array.isArray(m)?m:[] }); }).catch(console.error); } }, [selectedProject]);
 
   const navToProject = (p) => { setSelectedProject(p); setActiveTab(`project-${p.id}`); };
   const createTask = async (title) => { const res = await fetch(`${API_URL}/tasks`, { method:'POST', headers:{'Content-Type':'application/json'}, body:JSON.stringify({project_id: selectedProject.id, title})}); const t = await res.json(); setProjectData({...projectData, tasks: [...projectData.tasks, t]}); };
   const updateTask = async (uT) => { setProjectData(prev => ({ ...prev, tasks: prev.tasks.map(t => t.id === uT.id ? uT : t) })); await fetch(`${API_URL}/tasks/${uT.id}`, { method: 'PUT', headers: {'Content-Type': 'application/json'}, body: JSON.stringify(uT) }); };
-  
   const deleteTask = async (taskId) => { await fetch(`${API_URL}/recycle/tasks/${taskId}`, { method:'PUT' }); setProjectData(prev => ({ ...prev, tasks: prev.tasks.filter(t => t.id !== taskId) })); setEditingTask(null); };
   const deleteProject = async (projId) => { if(!confirm("Supprimer ?")) return; await fetch(`${API_URL}/recycle/projects/${projId}`, { method:'PUT' }); loadData(); setActiveTab('home'); setSelectedProject(null); };
   const deleteSite = async (siteId) => { if(!confirm("Supprimer site ?")) return; await fetch(`${API_URL}/recycle/sites/${siteId}`, { method:'PUT' }); loadData(); };
-
   const createSite = async (e) => { e.preventDefault(); if(!newSiteName) return; try { const res = await fetch(`${API_URL}/sites`, { method:'POST', headers:{'Content-Type':'application/json'}, body:JSON.stringify({name: newSiteName, owner_id: user.id})}); if(!res.ok) throw new Error(await res.text()); setNewSiteName(""); loadData(); } catch(err){ alert(err.message); } };
   const createProject = async (e, siteId) => { e.preventDefault(); if(!newProjectName) return; const res = await fetch(`${API_URL}/projects`, { method:'POST', headers:{'Content-Type':'application/json'}, body:JSON.stringify({name: newProjectName, owner_id: user.id, site_id: siteId})}); const newProj = await res.json(); setNewProjectName(""); setCreatingProjectForSite(null); loadData(); navToProject(newProj); };
 
@@ -350,7 +396,7 @@ export default function App() {
 
   return (
     <div style={{display:'flex', height:'100vh', width:'100vw'}}>
-        {editingTask && <TaskModal task={editingTask} projectMembers={projectData.members} currentUser={user} onClose={()=>setEditingTask(null)} onUpdate={updateTask} onDelete={deleteTask} />}
+        {editingTask && <TaskModal task={editingTask} allUsers={allUsers} currentUser={user} onClose={()=>setEditingTask(null)} onUpdate={updateTask} onDelete={deleteTask} />}
 
         <div className="sidebar" style={{width:'250px', flexShrink:0, overflowY:'auto', background:'#1e1f21', color:'white'}}>
             <div style={{padding:'20px', fontWeight:'bold', fontSize:'18px'}}>MedinaOS</div>
@@ -384,7 +430,20 @@ export default function App() {
             {activeTab === 'members' && <MembersView user={user} />}
             {activeTab === 'trash' && <TrashView />}
             {activeTab.startsWith('project-') && selectedProject && (
-                <ProjectView project={selectedProject} tasks={projectData.tasks} members={projectData.members} viewMode={viewMode} setViewMode={setViewMode} onAddTask={createTask} onEditTask={setEditingTask} onUpdateTask={updateTask} onDeleteProject={deleteProject} onInvite={()=>setActiveTab('members')} user={user} />
+                <ProjectView 
+                    project={selectedProject} 
+                    tasks={projectData.tasks} 
+                    members={projectData.members} 
+                    allUsers={allUsers} // <--- ON PASSE TOUT LE MONDE
+                    viewMode={viewMode} 
+                    setViewMode={setViewMode} 
+                    onAddTask={createTask} 
+                    onEditTask={setEditingTask} 
+                    onUpdateTask={updateTask} 
+                    onDeleteProject={deleteProject} 
+                    onInvite={()=>setActiveTab('members')} 
+                    user={user} 
+                />
             )}
         </div>
     </div>
