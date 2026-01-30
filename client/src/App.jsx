@@ -1,7 +1,7 @@
 import { useEffect, useState, useRef } from 'react'
 import Login from './Login'
 
-const API_URL = 'https://medina-api-xxxx.onrender.com'; // <--- VÉRIFIEZ VOTRE URL !
+const API_URL = 'https://medina-api.onrender.com'; // <--- VÉRIFIEZ VOTRE URL !
 
 // --- STYLE CSS MOBILE (TIROIR FLOTTANT) ---
 const mobileStyles = `
