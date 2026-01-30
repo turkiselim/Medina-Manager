@@ -1,44 +1,78 @@
-import { useEffect, useState } from 'react'
+import { useEffect, useState, useRef } from 'react'
 import Login from './Login'
 
-const API_URL = 'https://medina-api.onrender.com'; // <--- URL RENDER ICI
+const API_URL = 'https://medina-api.onrender.com'; // <--- VÉRIFIEZ CECI !
 
-// --- VUE CHRONOLOGIE (GANTT) ---
+// --- VUE CHRONOLOGIE (GANTT INTELLIGENT) ---
 function GanttView({ tasks, onEditTask }) {
-    // Calcul de la plage de date (Mois en cours + marges)
-    const getRange = () => {
-        const dates = tasks.flatMap(t => [new Date(t.start_date||Date.now()), new Date(t.due_date||Date.now())]);
-        if(dates.length===0) return {start: new Date(), end: new Date(new Date().setDate(new Date().getDate()+30))};
-        const min = new Date(Math.min(...dates)); min.setDate(min.getDate()-2);
-        const max = new Date(Math.max(...dates)); max.setDate(max.getDate()+5);
-        return {start: min, end: max};
-    };
-    const {start, end} = getRange();
-    const days = []; for(let d=new Date(start); d<=end; d.setDate(d.getDate()+1)) days.push(new Date(d));
+    const scrollRef = useRef(null);
 
-    // Positionnement des barres
+    // Calculer la plage de dates (On force sur le mois en cours pour éviter le bug 2025)
+    // On prend +/- 15 jours autour d'aujourd'hui, sauf si les tâches sont proches
+    const getRange = () => {
+        const now = new Date();
+        const start = new Date(now); start.setDate(now.getDate() - 10);
+        const end = new Date(now); end.setDate(now.getDate() + 20);
+        return { start, end };
+    };
+
+    const { start, end } = getRange();
+    const days = [];
+    for (let d = new Date(start); d <= end; d.setDate(d.getDate() + 1)) {
+        days.push(new Date(d));
+    }
+
+    // Scroll automatique vers le début
+    useEffect(() => {
+        if (scrollRef.current) scrollRef.current.scrollLeft = 0;
+    }, []);
+
     const getStyle = (t) => {
-        const s = new Date(t.start_date || t.created_at || Date.now());
-        const e = new Date(t.due_date || s);
-        if(e<s) e.setDate(s.getDate());
-        const diff = Math.ceil((s-start)/(1000*60*60*24));
-        const dur = Math.ceil((e-s)/(1000*60*60*24)) + 1;
-        return { left: `${diff*40}px`, width: `${dur*40}px`, background: t.status==='done'?'#10b981':(t.priority==='high'?'#ef4444':'#3b82f6') };
+        let s = new Date(t.start_date || Date.now());
+        let e = new Date(t.due_date || s);
+        
+        // CORRECTION AUTO DES DATES INVERSÉES (ex: Fin en 2025)
+        if (e < s) e = new Date(s); // Si la fin est avant le début, on la met au même jour
+        if (s < start) s = new Date(start); // On coupe visuellement si c'est trop vieux
+
+        const diff = Math.max(0, Math.ceil((s - start) / (1000 * 60 * 60 * 24)));
+        const dur = Math.max(1, Math.ceil((e - s) / (1000 * 60 * 60 * 24)) + 1);
+
+        // Si la tâche est hors champ, on ne l'affiche pas ou on la grise
+        const isVisible = (s >= start && s <= end) || (e >= start && e <= end) || (s < start && e > end);
+        
+        return { 
+            left: `${diff * 40}px`, 
+            width: `${dur * 40}px`, 
+            background: t.status === 'done' ? '#10b981' : (t.priority === 'high' ? '#ef4444' : '#3b82f6'),
+            opacity: isVisible ? 1 : 0.3
+        };
     };
 
     return (
-        <div style={{overflowX:'auto', background:'white', border:'1px solid #e0e0e0', borderRadius:'8px', height:'100%', display:'flex', flexDirection:'column'}}>
-            <div style={{display:'flex', borderBottom:'1px solid #eee', position:'sticky', top:0, background:'#f9f9f9', zIndex:10}}>
-                <div style={{minWidth:'200px', padding:'10px', borderRight:'1px solid #eee', position:'sticky', left:0, background:'#f9f9f9', zIndex:20, fontWeight:'bold'}}>Tâche</div>
-                {days.map((d,i)=><div key={i} style={{minWidth:'40px', padding:'10px 0', textAlign:'center', borderRight:'1px solid #eee', fontSize:'10px', color:'#666'}}><div>{d.getDate()}</div><div>{d.toLocaleDateString('fr',{month:'short'})}</div></div>)}
+        <div style={{overflowX: 'auto', background: 'white', border: '1px solid #e0e0e0', borderRadius: '8px', height: '100%', display: 'flex', flexDirection: 'column'}} ref={scrollRef}>
+            <div style={{display: 'flex', borderBottom: '1px solid #eee', position: 'sticky', top: 0, background: '#f9f9f9', zIndex: 10, minWidth:'fit-content'}}>
+                <div style={{minWidth: '200px', padding: '10px', borderRight: '1px solid #eee', position: 'sticky', left: 0, background: '#f9f9f9', zIndex: 20, fontWeight: 'bold'}}>Tâche</div>
+                {days.map((d, i) => (
+                    <div key={i} style={{minWidth: '40px', padding: '10px 0', textAlign: 'center', borderRight: '1px solid #eee', fontSize: '10px', color: '#666', background: d.toDateString() === new Date().toDateString() ? '#e0f2fe' : 'transparent'}}>
+                        <div style={{fontWeight: 'bold'}}>{d.getDate()}</div>
+                        <div>{d.toLocaleDateString('fr', { month: 'short' })}</div>
+                    </div>
+                ))}
             </div>
-            <div style={{flex:1, overflowY:'auto'}}>
+            <div style={{flex: 1, overflowY: 'auto', minWidth:'fit-content'}}>
                 {tasks.map(t => (
-                    <div key={t.id} style={{display:'flex', borderBottom:'1px solid #f9f9f9', height:'40px', alignItems:'center', position:'relative'}}>
-                        <div style={{minWidth:'200px', padding:'0 10px', borderRight:'1px solid #eee', position:'sticky', left:0, background:'white', zIndex:10, fontSize:'13px', fontWeight:'500', height:'100%', display:'flex', alignItems:'center'}}>{t.title}</div>
-                        <div style={{position:'relative', flex:1, height:'100%'}}>
-                            <div style={{position:'absolute', inset:0, display:'flex'}}>{days.map((_,i)=><div key={i} style={{minWidth:'40px', borderRight:'1px solid #f9f9f9'}}></div>)}</div>
-                            <div onClick={()=>onEditTask(t)} style={{...getStyle(t), position:'absolute', top:'8px', height:'24px', borderRadius:'4px', color:'white', fontSize:'11px', padding:'0 5px', overflow:'hidden', cursor:'pointer', whiteSpace:'nowrap'}}>{t.title}</div>
+                    <div key={t.id} style={{display: 'flex', borderBottom: '1px solid #f9f9f9', height: '40px', alignItems: 'center', position: 'relative'}}>
+                        <div style={{minWidth: '200px', padding: '0 10px', borderRight: '1px solid #eee', position: 'sticky', left: 0, background: 'white', zIndex: 10, fontSize: '13px', fontWeight: '500', height: '100%', display: 'flex', alignItems: 'center', overflow:'hidden', whiteSpace:'nowrap', textOverflow:'ellipsis'}} title={t.title}>
+                            {t.title}
+                        </div>
+                        <div style={{position: 'relative', flex: 1, height: '100%'}}>
+                            <div style={{position: 'absolute', inset: 0, display: 'flex'}}>
+                                {days.map((_, i) => <div key={i} style={{minWidth: '40px', borderRight: '1px solid #f9f9f9', height: '100%'}}></div>)}
+                            </div>
+                            <div onClick={() => onEditTask(t)} style={{...getStyle(t), position: 'absolute', top: '8px', height: '24px', borderRadius: '4px', color: 'white', fontSize: '11px', padding: '0 5px', overflow: 'hidden', cursor: 'pointer', whiteSpace: 'nowrap'}}>
+                                {t.title}
+                            </div>
                         </div>
                     </div>
                 ))}
@@ -47,7 +81,7 @@ function GanttView({ tasks, onEditTask }) {
     );
 }
 
-// --- MODALE TÂCHE (Avec Start Date) ---
+// --- MODALE TÂCHE ---
 function TaskModal({ task, allUsers, currentUser, onClose, onUpdate, onDelete }) {
   const [formData, setFormData] = useState(task);
   const [subtasks, setSubtasks] = useState([]);
@@ -79,11 +113,11 @@ function TaskModal({ task, allUsers, currentUser, onClose, onUpdate, onDelete })
             <div style={{flex:1, padding:'25px', background:'#f9fafb', display:'flex', flexDirection:'column', gap:'15px'}}>
                 <div><label style={{fontSize:'11px', fontWeight:'bold', color:'#888'}}>STATUT</label><select value={formData.status||'todo'} onChange={e=>setFormData({...formData, status: e.target.value})} style={{width:'100%', padding:'8px'}}><option value="todo">À Faire</option><option value="doing">En Cours</option><option value="done">Terminé</option></select></div>
                 <div><label style={{fontSize:'11px', fontWeight:'bold', color:'#888'}}>ASSIGNÉ À</label><select value={formData.assignee_id || ''} onChange={e=>setFormData({...formData, assignee_id: e.target.value})} style={{width:'100%', padding:'8px'}}><option value="">-- Personne --</option>{allUsers.map(m => (<option key={m.id} value={m.id}>{m.username}</option>))}</select></div>
-                {/* DATES */}
                 <div style={{display:'flex', gap:'10px'}}>
                     <div style={{flex:1}}><label style={{fontSize:'11px', fontWeight:'bold', color:'#888'}}>DÉBUT</label><input type="date" value={formData.start_date ? formData.start_date.split('T')[0] : ''} onChange={e=>setFormData({...formData, start_date: e.target.value})} style={{width:'100%', padding:'8px'}} /></div>
                     <div style={{flex:1}}><label style={{fontSize:'11px', fontWeight:'bold', color:'#888'}}>FIN</label><input type="date" value={formData.due_date ? formData.due_date.split('T')[0] : ''} onChange={e=>setFormData({...formData, due_date: e.target.value})} style={{width:'100%', padding:'8px'}} /></div>
                 </div>
+                <div><label style={{fontSize:'11px', fontWeight:'bold', color:'#888'}}>PRIORITÉ</label><select value={formData.priority||'medium'} onChange={e=>setFormData({...formData, priority:e.target.value})} style={{width:'100%', padding:'8px', borderRadius:'6px', border:'1px solid #cbd5e1'}}><option value="low">🟢 Basse</option><option value="medium">🟡 Moyenne</option><option value="high">🔴 Haute</option></select></div>
                 <div><label style={{fontSize:'11px', fontWeight:'bold', color:'#888'}}>PIÈCE JOINTE</label><div style={{marginTop:'5px'}}><label style={{padding:'5px', border:'1px solid #ccc', cursor:'pointer', background:'white'}}>📎 Upload<input type="file" onChange={uploadFile} style={{display:'none'}} /></label>{formData.attachment_url && <a href={formData.attachment_url} target="_blank" style={{marginLeft:'10px', color:'#3b82f6'}}>Voir</a>}</div></div>
                 <div style={{marginTop:'auto'}}><button onClick={handleSave} style={{width:'100%', padding:'10px', background:'#3b82f6', color:'white', border:'none', borderRadius:'6px', fontWeight:'bold'}}>Enregistrer</button></div>
             </div>
@@ -93,19 +127,23 @@ function TaskModal({ task, allUsers, currentUser, onClose, onUpdate, onDelete })
   );
 }
 
-// --- DASHBOARD GLOBAL (Directeur voit tout) ---
+// --- DASHBOARD (AVEC DEBUG) ---
 function Dashboard({ user, onOpenProject }) {
     const [activity, setActivity] = useState([]);
     const [stats, setStats] = useState({ projects: 0, pending: 0, completed: 0 });
     const [recentProjects, setRecentProjects] = useState([]);
+    const [error, setError] = useState(null);
 
     useEffect(() => {
         if (!user) return;
-        // Si Admin, on prend les stats globales, sinon perso
         const statsUrl = user.role === 'admin' ? `${API_URL}/stats/global` : `${API_URL}/stats/${user.id}`;
         const activityUrl = user.role === 'admin' ? `${API_URL}/activity/global` : `${API_URL}/users/${user.id}/activity`;
 
-        fetch(statsUrl).then(r=>r.json()).then(setStats).catch(console.error);
+        fetch(statsUrl)
+            .then(r => { if(!r.ok) throw new Error("Erreur serveur stats"); return r.json(); })
+            .then(setStats)
+            .catch(e => { console.error(e); setError("Impossible de charger les stats (Vérifiez server/index.js)"); });
+
         fetch(activityUrl).then(r=>r.json()).then(setActivity).catch(console.error);
         fetch(`${API_URL}/projects`).then(r=>r.json()).then(d => setRecentProjects(Array.isArray(d)?d.slice(0,4):[])).catch(console.error);
     }, [user]);
@@ -117,6 +155,9 @@ function Dashboard({ user, onOpenProject }) {
             <div className="dash-header" style={{padding:'40px'}}>
                 <div style={{color:'#666'}}>{today}</div>
                 <div style={{fontSize:'32px', fontWeight:'bold', marginBottom:'20px'}}>Bonjour, {user?.username}</div>
+                
+                {error && <div style={{background:'#fee2e2', color:'red', padding:'10px', marginBottom:'10px', borderRadius:'6px'}}>⚠️ {error}</div>}
+
                 <div style={{display:'flex', gap:'20px'}}>
                     <div style={{background:'white', padding:'20px', borderRadius:'10px', flex:1, textAlign:'center', border:'1px solid #ddd', boxShadow:'0 2px 5px rgba(0,0,0,0.02)'}}>
                         <div style={{fontSize:'30px', fontWeight:'bold', color:'#333'}}>{stats.projects}</div><div style={{fontSize:'12px', color:'#888', fontWeight:'bold'}}>PROJETS ACTIFS</div>
