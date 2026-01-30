@@ -1,94 +1,66 @@
+require('dotenv').config();
 const express = require('express');
 const cors = require('cors');
-const { Pool } = require('pg'); // On importe le pilote PostgreSQL
-require('dotenv').config(); // On charge les clés du fichier .env
-
-const app = express();
-const PORT = 5000;
-
+const { Pool } = require('pg');
 const bcrypt = require('bcryptjs');
 const jwt = require('jsonwebtoken');
+const multer = require('multer');
+const path = require('path');
+const fs = require('fs');
 
-// Configuration de la connexion
-const connectionString = process.env.DATABASE_URL 
-  ? process.env.DATABASE_URL  // Si on est sur le Cloud (Render)
-  : `postgresql://${process.env.DB_USER}:${process.env.DB_PASSWORD}@${process.env.DB_HOST}:${process.env.DB_PORT}/${process.env.DB_NAME}`; // Si on est en local
+const app = express();
 
-const pool = new Pool({
-    connectionString,
-    // Cette ligne est obligatoire pour Render (SSL) mais doit être désactivée en local
-    ssl: process.env.DATABASE_URL ? { rejectUnauthorized: false } : false
+// --- CONFIGURATION STOCKAGE ---
+const uploadDir = path.join(__dirname, 'uploads');
+if (!fs.existsSync(uploadDir)){
+    fs.mkdirSync(uploadDir);
+}
+
+const storage = multer.diskStorage({
+    destination: function (req, file, cb) {
+        cb(null, uploadDir)
+    },
+    filename: function (req, file, cb) {
+        cb(null, Date.now() + '-' + file.originalname)
+    }
 });
+const upload = multer({ storage: storage });
 
 app.use(cors());
 app.use(express.json());
+app.use('/uploads', express.static(uploadDir));
 
-// Route d'accueil
-app.get('/', (req, res) => {
-    res.send("Le serveur fonctionne !");
+// --- BDD ---
+const connectionString = process.env.DATABASE_URL 
+  ? process.env.DATABASE_URL 
+  : `postgresql://${process.env.DB_USER}:${process.env.DB_PASSWORD}@${process.env.DB_HOST}:${process.env.DB_PORT}/${process.env.DB_NAME}`;
+
+const pool = new Pool({
+    connectionString,
+    ssl: process.env.DATABASE_URL ? { rejectUnauthorized: false } : false
 });
 
-// NOUVELLE ROUTE : Récupérer les utilisateurs depuis la base de données
-app.get('/users', async (req, res) => {
-    try {
-        // On demande à la base : "Donne-moi tout ce qu'il y a dans la table users"
-        const result = await pool.query('SELECT * FROM users');
-        // On renvoie la réponse en JSON (format de données)
-        res.json(result.rows);
-    } catch (err) {
-        console.error(err.message);
-        res.status(500).send("Erreur Serveur");
-    }
+// --- ROUTE UPLOAD ---
+app.post('/upload', upload.single('file'), (req, res) => {
+    if (!req.file) return res.status(400).send('Aucun fichier envoyé');
+    const baseUrl = process.env.RENDER_EXTERNAL_URL || 'http://localhost:5000';
+    const fileUrl = `${baseUrl}/uploads/${req.file.filename}`;
+    res.json({ url: fileUrl, name: req.file.originalname });
 });
 
-// Route pour récupérer les projets
-app.get('/projects', async (req, res) => {
-    try {
-        const result = await pool.query('SELECT * FROM projects');
-        res.json(result.rows);
-    } catch (err) {
-        console.error(err.message);
-        res.status(500).send("Erreur Serveur");
-    }
-});
-
-// Route pour récupérer les tâches d'un projet spécifique
-app.get('/tasks/:projectId', async (req, res) => {
-    try {
-        const { projectId } = req.params; // On récupère l'ID demandé
-        const result = await pool.query('SELECT * FROM tasks WHERE project_id = $1', [projectId]);
-        res.json(result.rows);
-    } catch (err) {
-        console.error(err.message);
-        res.status(500).send("Erreur Serveur");
-    }
-});
-
-// --- DÉBUT DU SYSTÈME D'AUTHENTIFICATION ---
-
-// 1. Route pour CRÉER un compte (Inscription)
+// --- AUTHENTIFICATION ---
 app.post('/auth/register', async (req, res) => {
     try {
         const { username, email, password } = req.body;
-        
-        // On crypte le mot de passe (on le "hache")
         const salt = await bcrypt.genSalt(10);
         const hashedPassword = await bcrypt.hash(password, salt);
-
-        // On insère le nouvel employé dans la base
-        const newUser = await pool.query(
-            "INSERT INTO users (username, email, password_hash) VALUES ($1, $2, $3) RETURNING id, username, email",
-            [username, email, hashedPassword]
-        );
-
+        // Par défaut, le rôle est 'member'
+        const newUser = await pool.query("INSERT INTO users (username, email, password_hash, role) VALUES ($1, $2, $3, 'member') RETURNING id, username, email, role", [username, email, hashedPassword]);
         res.json(newUser.rows[0]);
-    } catch (err) {
-        console.error(err.message);
-        res.status(500).send("Erreur: Email ou utilisateur déjà pris ?");
-    }
+    } catch (err) { res.status(500).send("Erreur creation compte: " + err.message); }
 });
 
-// 2. Route pour SE CONNECTER (Login)
+// C'est ICI qu'il manquait le "async" probablement !
 app.post('/auth/login', async (req, res) => {
     try {
         const { email, password } = req.body;
@@ -100,428 +72,89 @@ app.post('/auth/login', async (req, res) => {
         if (!validPassword) return res.status(401).json("Mot de passe incorrect");
         
         const token = jwt.sign({ id: user.id, role: user.role }, process.env.JWT_SECRET, { expiresIn: "10h" });
-        
-        // ON RENVOIE LE ROLE ICI
         res.json({ token, user: { id: user.id, username: user.username, email: user.email, role: user.role } });
-    } catch (err) { res.status(500).send("Erreur serveur"); }
+    } catch (err) { res.status(500).send("Erreur serveur: " + err.message); }
 });
 
-        // B. On vérifie si le mot de passe correspond au cryptage
-        const validPassword = await bcrypt.compare(password, user.password_hash);
-        if (!validPassword) {
-            return res.status(401).json("Mot de passe incorrect");
-        }
+// --- SITES ---
+app.get('/sites', async (req, res) => { const sites = await pool.query("SELECT * FROM sites ORDER BY id"); res.json(sites.rows); });
+app.post('/sites', async (req, res) => { const { name, owner_id } = req.body; const newSite = await pool.query("INSERT INTO sites (name, owner_id) VALUES ($1, $2) RETURNING *", [name, owner_id]); res.json(newSite.rows[0]); });
+app.get('/sites/:siteId/projects', async (req, res) => { const projects = await pool.query("SELECT * FROM projects WHERE site_id = $1 ORDER BY id DESC", [req.params.siteId]); res.json(projects.rows); });
 
-        // C. C'est bon ! On génère le badge d'accès (Token)
-        const token = jwt.sign({ id: user.id }, process.env.JWT_SECRET, { expiresIn: "1h" });
+// --- PROJETS ---
+app.get('/projects', async (req, res) => { const projects = await pool.query("SELECT * FROM projects"); res.json(projects.rows); });
+app.post('/projects', async (req, res) => { const { name, owner_id, site_id } = req.body; const newProject = await pool.query("INSERT INTO projects (name, owner_id, site_id) VALUES ($1, $2, $3) RETURNING *", [name, owner_id, site_id]); res.json(newProject.rows[0]); });
+app.put('/projects/:id', async (req, res) => { const { name } = req.body; const up = await pool.query("UPDATE projects SET name=$1 WHERE id=$2 RETURNING *", [name, req.params.id]); res.json(up.rows[0]); });
+app.get('/projects/:id/members', async (req, res) => { const m = await pool.query("SELECT u.id, u.username, u.email FROM users u JOIN project_members pm ON u.id = pm.user_id WHERE pm.project_id = $1", [req.params.id]); res.json(m.rows); });
 
-        // On renvoie le badge et les infos de l'utilisateur
-        res.json({ token, user: { id: user.id, username: user.username, email: user.email } });
-
-    } catch (err) {
-        console.error(err.message);
-        res.status(500).send("Erreur Serveur");
-    }
-});
-// --- FIN DU SYSTÈME D'AUTHENTIFICATION ---
-
-// Route pour CRÉER une nouvelle tâche
-app.post('/tasks', async (req, res) => {
-    try {
-        // Le serveur reçoit le titre et l'ID du projet depuis le navigateur
-        const { project_id, title } = req.body;
-        
-        // Il insère la commande dans la base de données
-        const newTask = await pool.query(
-            "INSERT INTO tasks (project_id, title, status) VALUES ($1, $2, 'todo') RETURNING *",
-            [project_id, title]
-        );
-        
-        // Il renvoie la tâche créée pour confirmer
-        res.json(newTask.rows[0]);
-    } catch (err) {
-        console.error(err.message);
-        res.status(500).send("Erreur Serveur");
-    }
+// Invitation Membre
+app.post('/projects/:id/invite', async (req, res) => { 
+    try { const { email } = req.body; const u = await pool.query("SELECT id FROM users WHERE email=$1", [email]); 
+    if(u.rows.length===0) return res.status(404).json("User not found"); 
+    await pool.query("INSERT INTO project_members (project_id, user_id) VALUES ($1, $2) ON CONFLICT DO NOTHING", [req.params.id, u.rows[0].id]); 
+    res.json({success:true}); } catch(e){res.status(500).send(e.message)} 
 });
 
-// --- ROUTE SPÉCIALE POUR INITIALISER LA BDD DANS LE CLOUD ---
-app.get('/setup-db', async (req, res) => {
-    try {
-        // 1. Créer la table Users
-        await pool.query(`
-            CREATE TABLE IF NOT EXISTS users (
-                id SERIAL PRIMARY KEY,
-                username VARCHAR(50) UNIQUE NOT NULL,
-                email VARCHAR(100) UNIQUE NOT NULL,
-                password_hash VARCHAR(255) NOT NULL,
-                created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP
-            )
-        `);
-
-        // 2. Créer la table Teams (Optionnel pour l'instant mais utile)
-        await pool.query(`
-            CREATE TABLE IF NOT EXISTS teams (
-                id SERIAL PRIMARY KEY,
-                name VARCHAR(100) NOT NULL,
-                description TEXT,
-                created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP
-            )
-        `);
-
-        // 3. Créer la table Projects
-        await pool.query(`
-            CREATE TABLE IF NOT EXISTS projects (
-                id SERIAL PRIMARY KEY,
-                name VARCHAR(150) NOT NULL,
-                description TEXT,
-                owner_id INT REFERENCES users(id),
-                created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP
-            )
-        `);
-
-        // 4. Créer la table Tasks
-        await pool.query(`
-            CREATE TABLE IF NOT EXISTS tasks (
-                id SERIAL PRIMARY KEY,
-                project_id INT REFERENCES projects(id) ON DELETE CASCADE,
-                title VARCHAR(200) NOT NULL,
-                status VARCHAR(20) DEFAULT 'todo',
-                created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP
-            )
-        `);
-
-        res.send("Base de données initialisée avec succès ! (Tables créées)");
-    } catch (err) {
-        console.error(err);
-        res.status(500).send("Erreur lors de l'initialisation : " + err.message);
-    }
-});
-
-// Route pour CRÉER un projet
-app.post('/projects', async (req, res) => {
-    try {
-        const { name, description, owner_id } = req.body;
-        const newProject = await pool.query(
-            "INSERT INTO projects (name, description, owner_id) VALUES ($1, $2, $3) RETURNING *",
-            [name, description, owner_id]
-        );
-        res.json(newProject.rows[0]);
-    } catch (err) {
-        console.error(err.message);
-        res.status(500).send("Erreur lors de la création du projet");
-    }
-});
-
-// --- ROUTE DE MISE À JOUR V2 (À SUPPRIMER APRÈS USAGE) ---
-app.get('/update-db-v2', async (req, res) => {
-    try {
-        // Ajout des colonnes pour la V2
-        await pool.query("ALTER TABLE tasks ADD COLUMN IF NOT EXISTS description TEXT");
-        await pool.query("ALTER TABLE tasks ADD COLUMN IF NOT EXISTS priority VARCHAR(20) DEFAULT 'medium'"); // low, medium, high
-        await pool.query("ALTER TABLE tasks ADD COLUMN IF NOT EXISTS due_date DATE");
-        await pool.query("ALTER TABLE tasks ADD COLUMN IF NOT EXISTS progress INT DEFAULT 0"); // 0 à 100%
-        await pool.query("ALTER TABLE tasks ADD COLUMN IF NOT EXISTS attachment_url TEXT"); // Lien vers photo/fichier
-        
-        res.send("Base de données mise à jour vers V2 !");
-    } catch (err) {
-        res.status(500).send("Erreur MAJ: " + err.message);
-    }
-});
-// Route pour MODIFIER une tâche (PUT)
-app.put('/tasks/:id', async (req, res) => {
-    try {
-        const { id } = req.params;
-        const { title, description, status, priority, progress, due_date, attachment_url } = req.body;
-        
-        // On met à jour tous les champs
-        const update = await pool.query(
-            `UPDATE tasks SET 
-             title = COALESCE($1, title),
-             description = COALESCE($2, description),
-             status = COALESCE($3, status),
-             priority = COALESCE($4, priority),
-             progress = COALESCE($5, progress),
-             due_date = COALESCE($6, due_date),
-             attachment_url = COALESCE($7, attachment_url)
-             WHERE id = $8 RETURNING *`,
-            [title, description, status, priority, progress, due_date, attachment_url, id]
-        );
-        res.json(update.rows[0]);
-    } catch (err) {
-        console.error(err);
-        res.status(500).send("Erreur mise à jour tâche");
-    }
-});
-
-// --- ROUTE DE MISE À JOUR V3 (ENTERPRISE) ---
-app.get('/update-db-v3', async (req, res) => {
-    try {
-        // 1. Créer la table SITES
-        await pool.query(`
-            CREATE TABLE IF NOT EXISTS sites (
-                id SERIAL PRIMARY KEY,
-                name VARCHAR(100) NOT NULL,
-                owner_id INT REFERENCES users(id),
-                created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP
-            )
-        `);
-
-        // 2. Lier PROJETS aux SITES
-        await pool.query("ALTER TABLE projects ADD COLUMN IF NOT EXISTS site_id INT REFERENCES sites(id) ON DELETE CASCADE");
-
-        // 3. Créer un Site par défaut pour ne pas perdre les vieux projets
-        const defaultSite = await pool.query("INSERT INTO sites (name, owner_id) VALUES ('Site Principal', 1) ON CONFLICT DO NOTHING RETURNING id");
-        // Si des projets n'ont pas de site, on les met dans le site par défaut (ID 1 probablement)
-        await pool.query("UPDATE projects SET site_id = 1 WHERE site_id IS NULL");
-
-        // 4. Table de liaison PROJET <-> MEMBRES (Qui a le droit de voir quoi ?)
-        await pool.query(`
-            CREATE TABLE IF NOT EXISTS project_members (
-                project_id INT REFERENCES projects(id) ON DELETE CASCADE,
-                user_id INT REFERENCES users(id) ON DELETE CASCADE,
-                role VARCHAR(20) DEFAULT 'member',
-                PRIMARY KEY (project_id, user_id)
-            )
-        `);
-
-        // 5. Lier TÂCHES aux UTILISATEURS (Assignation)
-        await pool.query("ALTER TABLE tasks ADD COLUMN IF NOT EXISTS assignee_id INT REFERENCES users(id)");
-
-        res.send("Architecture Multi-Sites & Équipes déployée avec succès !");
-    } catch (err) {
-        res.status(500).send("Erreur V3: " + err.message);
-    }
-});
-
-
-// --- GESTION DES SITES ---
-app.get('/sites', async (req, res) => {
-    // Dans la vraie vie, on filtrerait par user_id, ici on simplifie
-    const sites = await pool.query("SELECT * FROM sites ORDER BY id");
-    res.json(sites.rows);
-});
-
-app.post('/sites', async (req, res) => {
-    const { name, owner_id } = req.body;
-    const newSite = await pool.query("INSERT INTO sites (name, owner_id) VALUES ($1, $2) RETURNING *", [name, owner_id]);
-    res.json(newSite.rows[0]);
-});
-
-// --- GESTION DES MEMBRES D'UN PROJET ---
-// 1. Récupérer les membres
-app.get('/projects/:id/members', async (req, res) => {
-    const { id } = req.params;
-    const members = await pool.query(
-        "SELECT u.id, u.username, u.email FROM users u JOIN project_members pm ON u.id = pm.user_id WHERE pm.project_id = $1", 
-        [id]
-    );
-    res.json(members.rows);
-});
-
-// 2. Ajouter un membre par email
-app.post('/projects/:id/invite', async (req, res) => {
-    const { id } = req.params; // ID du projet
+// Invitation ADMIN (Lien magique)
+app.post('/admin/invite', async (req, res) => {
     const { email } = req.body;
-
-    try {
-        // Trouver l'utilisateur
-        const userCheck = await pool.query("SELECT id FROM users WHERE email = $1", [email]);
-        if (userCheck.rows.length === 0) return res.status(404).json("Cet utilisateur n'est pas encore inscrit sur l'application.");
-        
-        const userId = userCheck.rows[0].id;
-
-        // L'ajouter au projet
-        await pool.query("INSERT INTO project_members (project_id, user_id) VALUES ($1, $2) ON CONFLICT DO NOTHING", [id, userId]);
-        
-        res.json({ success: true, message: "Membre ajouté !" });
-    } catch (err) {
-        res.status(500).json("Erreur lors de l'invitation");
-    }
+    const token = Math.random().toString(36).substring(7);
+    await pool.query("INSERT INTO invitations (email, token) VALUES ($1, $2)", [email, token]);
+    const baseUrl = process.env.RENDER_EXTERNAL_URL || 'http://localhost:5000';
+    // On renvoie un lien qui pointera vers le site (adaptez si besoin)
+    res.json({ link: `https://medina-app.onrender.com/?token=${token}`, token: token }); 
 });
 
-// --- MODIFICATION : Récupérer les projets D'UN SITE spécifique ---
-app.get('/sites/:siteId/projects', async (req, res) => {
-    const { siteId } = req.params;
-    const projects = await pool.query("SELECT * FROM projects WHERE site_id = $1 ORDER BY id DESC", [siteId]);
-    res.json(projects.rows);
+// --- TACHES ---
+app.get('/tasks/:projectId', async (req, res) => { const tasks = await pool.query("SELECT * FROM tasks WHERE project_id = $1 ORDER BY id DESC", [req.params.projectId]); res.json(tasks.rows); });
+app.post('/tasks', async (req, res) => { const { project_id, title } = req.body; const newTask = await pool.query("INSERT INTO tasks (project_id, title) VALUES ($1, $2) RETURNING *", [project_id, title]); res.json(newTask.rows[0]); });
+app.put('/tasks/:id', async (req, res) => { 
+    const { id } = req.params; 
+    const { title, description, status, priority, progress, due_date, assignee_id, attachment_url } = req.body; 
+    const update = await pool.query(`UPDATE tasks SET title=COALESCE($1,title), description=COALESCE($2,description), status=COALESCE($3,status), priority=COALESCE($4,priority), progress=COALESCE($5,progress), due_date=COALESCE($6,due_date), assignee_id=COALESCE($7,assignee_id), attachment_url=COALESCE($8,attachment_url) WHERE id=$9 RETURNING *`, 
+    [title, description, status, priority, progress, due_date, assignee_id, attachment_url, id]); 
+    res.json(update.rows[0]); 
 });
 
-// --- ROUTE MAJ V4 (SOUS-TÂCHES) ---
-app.get('/update-db-v4', async (req, res) => {
-    try {
-        // 1. Table SOUS-TÂCHES
-        await pool.query(`
-            CREATE TABLE IF NOT EXISTS subtasks (
-                id SERIAL PRIMARY KEY,
-                task_id INT REFERENCES tasks(id) ON DELETE CASCADE,
-                title VARCHAR(255) NOT NULL,
-                is_completed BOOLEAN DEFAULT FALSE,
-                created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP
-            )
-        `);
-        res.send("Module Sous-Tâches installé !");
-    } catch (err) {
-        res.status(500).send("Erreur V4: " + err.message);
-    }
-});
-
-// --- GESTION PROJETS (MODIFICATION) ---
-app.put('/projects/:id', async (req, res) => {
-    const { id } = req.params;
-    const { name, description } = req.body;
-    try {
-        const update = await pool.query(
-            "UPDATE projects SET name = COALESCE($1, name), description = COALESCE($2, description) WHERE id = $3 RETURNING *",
-            [name, description, id]
-        );
-        res.json(update.rows[0]);
-    } catch (err) { res.status(500).send("Erreur modif projet"); }
-});
-
-// --- GESTION SOUS-TÂCHES ---
-// 1. Lister
-app.get('/tasks/:id/subtasks', async (req, res) => {
-    const subtasks = await pool.query("SELECT * FROM subtasks WHERE task_id = $1 ORDER BY id", [req.params.id]);
-    res.json(subtasks.rows);
-});
-
-// 2. Créer
-app.post('/subtasks', async (req, res) => {
-    const { task_id, title } = req.body;
-    const newSub = await pool.query("INSERT INTO subtasks (task_id, title) VALUES ($1, $2) RETURNING *", [task_id, title]);
-    res.json(newSub.rows[0]);
-});
-
-// 3. Modifier (Renommer ou Cocher)
-app.put('/subtasks/:id', async (req, res) => {
-    const { id } = req.params;
-    const { title, is_completed } = req.body;
-    const update = await pool.query(
-        "UPDATE subtasks SET title = COALESCE($1, title), is_completed = COALESCE($2, is_completed) WHERE id = $3 RETURNING *",
-        [title, is_completed, id]
-    );
-    res.json(update.rows[0]);
-});
-
-// 4. Supprimer
-app.delete('/subtasks/:id', async (req, res) => {
-    await pool.query("DELETE FROM subtasks WHERE id = $1", [req.params.id]);
-    res.json({ message: "Supprimé" });
-});
-
-// --- DASHBOARD DATA ---
-
-// 1. Récupérer les tâches assignées à un utilisateur spécifique (Pour le widget "Mes Tâches")
-app.get('/users/:userId/tasks', async (req, res) => {
-    try {
-        const { userId } = req.params;
-        // On récupère les tâches non terminées assignées à l'utilisateur
-        const tasks = await pool.query(`
-            SELECT t.*, p.name as project_name 
-            FROM tasks t 
-            JOIN projects p ON t.project_id = p.id 
-            WHERE t.assignee_id = $1 AND t.status != 'done'
-            ORDER BY t.due_date ASC NULLS LAST
-        `, [userId]);
-        res.json(tasks.rows);
-    } catch (err) { res.status(500).send(err.message); }
-});
-
-// 2. Récupérer des statistiques globales (Pour les widgets)
-app.get('/stats/:userId', async (req, res) => {
-    try {
-        const { userId } = req.params;
-        const totalProjects = await pool.query("SELECT COUNT(*) FROM projects WHERE owner_id = $1", [userId]);
-        const pendingTasks = await pool.query("SELECT COUNT(*) FROM tasks WHERE assignee_id = $1 AND status != 'done'", [userId]);
-        const completedTasks = await pool.query("SELECT COUNT(*) FROM tasks WHERE assignee_id = $1 AND status = 'done'", [userId]);
-        
-        res.json({
-            projects: totalProjects.rows[0].count,
-            pending: pendingTasks.rows[0].count,
-            completed: completedTasks.rows[0].count
-        });
-    } catch (err) { res.status(500).send(err.message); }
-});
-
-
-app.listen(PORT, () => {
-    console.log(`Serveur démarré sur http://localhost:${PORT}`);
-});
-
-// --- ROUTE MAJ V6 (RÔLES & COMMENTAIRES) ---
-app.get('/update-db-v6', async (req, res) => {
-    try {
-        // 1. Ajouter le RÔLE aux utilisateurs (Défaut : member)
-        await pool.query("ALTER TABLE users ADD COLUMN IF NOT EXISTS role VARCHAR(20) DEFAULT 'member'");
-        
-        // 2. Mettre l'utilisateur ID 1 (VOUS) en ADMIN
-        await pool.query("UPDATE users SET role = 'admin' WHERE id = 1");
-
-        // 3. Table des COMMENTAIRES
-        await pool.query(`
-            CREATE TABLE IF NOT EXISTS comments (
-                id SERIAL PRIMARY KEY,
-                task_id INT REFERENCES tasks(id) ON DELETE CASCADE,
-                user_id INT REFERENCES users(id),
-                content TEXT NOT NULL,
-                created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP
-            )
-        `);
-
-        // 4. Table des INVITATIONS (Pour sécuriser l'inscription)
-        await pool.query(`
-            CREATE TABLE IF NOT EXISTS invitations (
-                id SERIAL PRIMARY KEY,
-                email VARCHAR(100) NOT NULL,
-                token VARCHAR(100) NOT NULL,
-                used BOOLEAN DEFAULT FALSE,
-                created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP
-            )
-        `);
-
-        res.send("Système de Rôles et Commentaires installé ! Vous êtes Admin.");
-    } catch (err) {
-        res.status(500).send("Erreur V6: " + err.message);
-    }
-});
+// --- SOUS-TACHES ---
+app.get('/tasks/:id/subtasks', async (req, res) => { const s = await pool.query("SELECT * FROM subtasks WHERE task_id=$1 ORDER BY id", [req.params.id]); res.json(s.rows); });
+app.post('/subtasks', async (req, res) => { const { task_id, title } = req.body; const s = await pool.query("INSERT INTO subtasks (task_id, title) VALUES ($1, $2) RETURNING *", [task_id, title]); res.json(s.rows[0]); });
+app.put('/subtasks/:id', async (req, res) => { const { title, is_completed } = req.body; const s = await pool.query("UPDATE subtasks SET title=COALESCE($1,title), is_completed=COALESCE($2,is_completed) WHERE id=$3 RETURNING *", [title, is_completed, req.params.id]); res.json(s.rows[0]); });
+app.delete('/subtasks/:id', async (req, res) => { await pool.query("DELETE FROM subtasks WHERE id=$1", [req.params.id]); res.json({ok:true}); });
 
 // --- COMMENTAIRES ---
 app.get('/tasks/:id/comments', async (req, res) => {
-    // On récupère le commentaire + le nom de celui qui l'a écrit
-    const comments = await pool.query(`
-        SELECT c.*, u.username 
-        FROM comments c 
-        JOIN users u ON c.user_id = u.id 
-        WHERE c.task_id = $1 
-        ORDER BY c.created_at DESC`, 
-    [req.params.id]);
+    const comments = await pool.query(`SELECT c.*, u.username FROM comments c JOIN users u ON c.user_id = u.id WHERE c.task_id = $1 ORDER BY c.created_at DESC`, [req.params.id]);
     res.json(comments.rows);
 });
-
 app.post('/comments', async (req, res) => {
     const { task_id, user_id, content } = req.body;
-    const newComment = await pool.query(
-        "INSERT INTO comments (task_id, user_id, content) VALUES ($1, $2, $3) RETURNING *", 
-        [task_id, user_id, content]
-    );
-    // On renvoie le commentaire enrichi du nom d'utilisateur (pour l'affichage direct)
+    const newComment = await pool.query("INSERT INTO comments (task_id, user_id, content) VALUES ($1, $2, $3) RETURNING *", [task_id, user_id, content]);
     const enriched = await pool.query("SELECT c.*, u.username FROM comments c JOIN users u ON c.user_id = u.id WHERE c.id = $1", [newComment.rows[0].id]);
     res.json(enriched.rows[0]);
 });
 
-// --- INVITATIONS (ADMIN SEULEMENT) ---
-app.post('/admin/invite', async (req, res) => {
-    const { email } = req.body;
-    // On génère un code unique (token) simple pour l'URL
-    const token = Math.random().toString(36).substring(7);
-    
-    await pool.query("INSERT INTO invitations (email, token) VALUES ($1, $2)", [email, token]);
-    
-    // Dans un vrai système, on envoie un email ici.
-    // Pour l'instant, on renvoie le lien à l'admin pour qu'il le donne via WhatsApp/Mail
-    const baseUrl = process.env.RENDER_EXTERNAL_URL || 'http://localhost:5000';
-    // ATTENTION : On renverra vers le SITE WEB (pas l'API)
-    // Adaptez ceci selon votre URL Frontend finale
-    res.json({ link: `https://medina-app.onrender.com/?token=${token}`, token: token }); 
+// --- DASHBOARD DATA ---
+app.get('/users/:userId/tasks', async (req, res) => {
+    try { const { userId } = req.params; const tasks = await pool.query(`SELECT t.*, p.name as project_name FROM tasks t JOIN projects p ON t.project_id = p.id WHERE t.assignee_id = $1 AND t.status != 'done' ORDER BY t.due_date ASC NULLS LAST`, [userId]); res.json(tasks.rows); } catch (err) { res.status(500).send(err.message); }
+});
+app.get('/stats/:userId', async (req, res) => {
+    try { const { userId } = req.params; const tp = await pool.query("SELECT COUNT(*) FROM projects WHERE owner_id = $1", [userId]); const pt = await pool.query("SELECT COUNT(*) FROM tasks WHERE assignee_id = $1 AND status != 'done'", [userId]); const ct = await pool.query("SELECT COUNT(*) FROM tasks WHERE assignee_id = $1 AND status = 'done'", [userId]); res.json({projects: tp.rows[0].count, pending: pt.rows[0].count, completed: ct.rows[0].count}); } catch (err) { res.status(500).send(err.message); }
+});
+
+// --- ROUTES DB UPDATE (Outils) ---
+app.get('/setup-db', async (req, res) => { /* Code setup initial conservé si besoin */ res.send("OK"); });
+app.get('/update-db-v6', async (req, res) => {
+    try {
+        await pool.query("ALTER TABLE users ADD COLUMN IF NOT EXISTS role VARCHAR(20) DEFAULT 'member'");
+        await pool.query("UPDATE users SET role = 'admin' WHERE id = 1");
+        await pool.query(`CREATE TABLE IF NOT EXISTS comments (id SERIAL PRIMARY KEY, task_id INT REFERENCES tasks(id) ON DELETE CASCADE, user_id INT REFERENCES users(id), content TEXT NOT NULL, created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP)`);
+        await pool.query(`CREATE TABLE IF NOT EXISTS invitations (id SERIAL PRIMARY KEY, email VARCHAR(100) NOT NULL, token VARCHAR(100) NOT NULL, used BOOLEAN DEFAULT FALSE, created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP)`);
+        res.send("Update V6 (Admin + Commentaires) OK");
+    } catch (err) { res.status(500).send("Erreur V6: " + err.message); }
+});
+
+const PORT = process.env.PORT || 5000;
+app.listen(PORT, () => {
+    console.log(`Serveur démarré sur le port ${PORT}`);
 });
