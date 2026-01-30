@@ -1,22 +1,58 @@
 import { useEffect, useState, useRef } from 'react'
 import Login from './Login'
 
-const API_URL = 'https://medina-api-xxxx.onrender.com'; // <--- VÉRIFIEZ VOTRE URL !
+const API_URL = 'https://medina-api.onrender.com'; // <--- VÉRIFIEZ VOTRE URL !
 
-// --- STYLE CSS MOBILE (Injecté dynamiquement) ---
+// --- STYLE CSS MOBILE (TIROIR FLOTTANT) ---
 const mobileStyles = `
   @media (max-width: 768px) {
-    .app-container { flex-direction: column; }
-    .sidebar { width: 100% !important; height: auto !important; position: relative; }
-    .sidebar-content { display: none; }
-    .sidebar.open .sidebar-content { display: block; }
+    /* Conteneur principal */
+    .app-container { flex-direction: column; overflow-x: hidden; }
+    
+    /* Header Mobile (Visible uniquement sur tel) */
+    .mobile-header { 
+        display: flex !important; 
+        position: fixed; 
+        top: 0; left: 0; right: 0; 
+        height: 60px; 
+        z-index: 900; 
+        box-shadow: 0 2px 5px rgba(0,0,0,0.1);
+    }
+
+    /* La Sidebar devient un tiroir caché */
+    .sidebar { 
+        position: fixed !important;
+        top: 0; left: 0; bottom: 0;
+        width: 260px !important;
+        transform: translateX(-100%); /* Caché à gauche */
+        transition: transform 0.3s ease;
+        z-index: 1000;
+        box-shadow: 5px 0 15px rgba(0,0,0,0.3);
+    }
+    
+    /* Quand le menu est ouvert */
+    .sidebar.open { transform: translateX(0); }
+
+    /* Le contenu principal prend tout l'écran */
+    .main-content { 
+        margin-top: 60px; /* Pour ne pas être caché par le header */
+        width: 100% !important; 
+        flex: 1;
+    }
+
+    /* Ajustements Dashboard */
     .dash-stats { flex-direction: column; }
-    .project-header { flex-direction: column; align-items: flex-start; gap: 10px; }
-    .view-buttons { width: 100%; display: flex; overflow-x: auto; }
-    .view-buttons button { flex: 1; white-space: nowrap; }
-    .task-modal { width: 95% !important; height: 90vh !important; }
+    .dash-header { padding: 20px !important; }
+    
+    /* Modale Plein Écran */
+    .task-modal { width: 100% !important; height: 100% !important; borderRadius: 0 !important; }
     .task-modal-body { flex-direction: column; }
-    .task-modal-left { border-right: none !important; border-bottom: 1px solid #eee; }
+    .task-modal-left { border-right: none !important; border-bottom: 1px solid #eee; height: 50%; }
+    
+    /* Overlay sombre quand le menu est ouvert */
+    .menu-overlay {
+        position: fixed; inset: 0; background: rgba(0,0,0,0.5); z-index: 950;
+    }
   }
 `;
 
@@ -25,7 +61,7 @@ function GanttView({ tasks, onEditTask }) {
     const scrollRef = useRef(null);
     const getRange = () => {
         const now = new Date();
-        const start = new Date(now); start.setDate(now.getDate() - 5); // Moins de jours sur mobile
+        const start = new Date(now); start.setDate(now.getDate() - 5);
         const end = new Date(now); end.setDate(now.getDate() + 15);
         return { start, end };
     };
@@ -67,7 +103,7 @@ function GanttView({ tasks, onEditTask }) {
     );
 }
 
-// --- MODALE TÂCHE (RESPONSIVE) ---
+// --- MODALE TÂCHE ---
 function TaskModal({ task, allUsers, currentUser, onClose, onUpdate, onDelete }) {
   const [formData, setFormData] = useState(task);
   const [subtasks, setSubtasks] = useState([]);
@@ -109,7 +145,7 @@ function TaskModal({ task, allUsers, currentUser, onClose, onUpdate, onDelete })
   );
 }
 
-// --- DASHBOARD (RESPONSIVE) ---
+// --- DASHBOARD ---
 function Dashboard({ user }) {
     const [activity, setActivity] = useState([]);
     const [stats, setStats] = useState({ projects: 0, pending: 0, completed: 0 });
@@ -159,7 +195,7 @@ function Dashboard({ user }) {
     )
 }
 
-// --- VUE MEMBRES (RESPONSIVE) ---
+// --- VUE MEMBRES ---
 function MembersView({ user }) {
     const [email, setEmail] = useState("");
     const [inviteLink, setInviteLink] = useState("");
@@ -187,7 +223,7 @@ function MembersView({ user }) {
     );
 }
 
-// --- VUE PROJET (RESPONSIVE) ---
+// --- VUE PROJET ---
 function ProjectView({ project, tasks, members, allUsers, viewMode, setViewMode, onAddTask, onEditTask, onUpdateTask, onInvite, onDeleteProject, user }) {
     const [newTaskTitle, setNewTaskTitle] = useState("");
     const handleDragStart = (e, taskId) => e.dataTransfer.setData("taskId", taskId);
@@ -239,7 +275,7 @@ function ProjectView({ project, tasks, members, allUsers, viewMode, setViewMode,
     )
 }
 
-// --- APP PRINCIPALE (AVEC MENU BURGER MOBILE) ---
+// --- APP PRINCIPALE ---
 export default function App() {
   const [token, setToken] = useState(localStorage.getItem('hotel_token'));
   const [user, setUser] = useState(() => { try { return JSON.parse(localStorage.getItem('hotel_user')); } catch { return null; } });
@@ -251,7 +287,7 @@ export default function App() {
   const [projectData, setProjectData] = useState({ tasks: [], members: [] });
   const [viewMode, setViewMode] = useState('board');
   const [editingTask, setEditingTask] = useState(null);
-  const [mobileMenuOpen, setMobileMenuOpen] = useState(false); // <--- ÉTAT MENU MOBILE
+  const [mobileMenuOpen, setMobileMenuOpen] = useState(false); // <--- ÉTAT MENU BURGER
   const [newSiteName, setNewSiteName] = useState("");
   const [newProjectName, setNewProjectName] = useState("");
   const [creatingProjectForSite, setCreatingProjectForSite] = useState(null);
@@ -276,16 +312,19 @@ export default function App() {
   if (!token || !user) return <Login onLogin={handleLogin} />;
 
   return (
-    <div className="app-container" style={{display:'flex', height:'100vh', width:'100vw', overflow:'hidden'}}>
+    <div className="app-container" style={{display:'flex', height:'100vh', width:'100vw'}}>
         {editingTask && <TaskModal task={editingTask} allUsers={allUsers} currentUser={user} onClose={()=>setEditingTask(null)} onUpdate={updateTask} onDelete={deleteTask} />}
 
-        {/* HEADER MOBILE SEULEMENT */}
+        {/* HEADER MOBILE (NOUVEAU) */}
         <div style={{display: 'none', padding:'15px', background:'#1e1f21', color:'white', alignItems:'center', justifyContent:'space-between'}} className="mobile-header">
             <span style={{fontWeight:'bold'}}>MedinaOS</span>
             <button onClick={()=>setMobileMenuOpen(!mobileMenuOpen)} style={{background:'none', border:'none', color:'white', fontSize:'24px'}}>☰</button>
         </div>
 
-        {/* SIDEBAR (Responsive) */}
+        {/* OVERLAY SOMBRE QUAND MENU OUVERT */}
+        {mobileMenuOpen && <div className="menu-overlay" onClick={()=>setMobileMenuOpen(false)}></div>}
+
+        {/* SIDEBAR FLOTTANTE */}
         <div className={`sidebar ${mobileMenuOpen ? 'open' : ''}`} style={{width:'250px', flexShrink:0, overflowY:'auto', background:'#1e1f21', color:'white', zIndex:100}}>
             <div className="sidebar-content">
                 <div style={{padding:'20px', fontWeight:'bold', fontSize:'18px'}}>MedinaOS</div>
@@ -304,16 +343,8 @@ export default function App() {
             </div>
         </div>
 
-        {/* MAIN CONTENT */}
-        <div style={{flex:1, overflow:'hidden', background:'white', position:'relative'}}>
-            {/* BOUTON MENU BURGER FLOTTANT (Visible uniquement sur mobile) */}
-            <button 
-                onClick={()=>setMobileMenuOpen(!mobileMenuOpen)} 
-                style={{position:'absolute', top:'10px', right:'10px', zIndex:50, background:'#333', color:'white', border:'none', borderRadius:'4px', padding:'5px 10px', display: window.innerWidth > 768 ? 'none' : 'block'}}
-            >
-                ☰ Menu
-            </button>
-
+        {/* CONTENU PRINCIPAL */}
+        <div className="main-content" style={{flex:1, overflow:'hidden', background:'white', position:'relative'}}>
             {activeTab === 'home' && <Dashboard user={user} onOpenProject={navToProject} />}
             {activeTab === 'members' && <MembersView user={user} />}
             {activeTab === 'trash' && <TrashView />}
