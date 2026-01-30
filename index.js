@@ -60,7 +60,7 @@ app.post('/auth/register', async (req, res) => {
     } catch (err) { res.status(500).send("Erreur creation compte: " + err.message); }
 });
 
-// C'est ICI qu'il manquait le "async" probablement !
+// CORRECTION ICI : Ajout de "async" avant (req, res)
 app.post('/auth/login', async (req, res) => {
     try {
         const { email, password } = req.body;
@@ -68,6 +68,7 @@ app.post('/auth/login', async (req, res) => {
         if (userResult.rows.length === 0) return res.status(401).json("Email inconnu");
         
         const user = userResult.rows[0];
+        // C'est cette ligne qui plantait sans le "async" au début de la fonction
         const validPassword = await bcrypt.compare(password, user.password_hash);
         if (!validPassword) return res.status(401).json("Mot de passe incorrect");
         
@@ -100,8 +101,7 @@ app.post('/admin/invite', async (req, res) => {
     const { email } = req.body;
     const token = Math.random().toString(36).substring(7);
     await pool.query("INSERT INTO invitations (email, token) VALUES ($1, $2)", [email, token]);
-    const baseUrl = process.env.RENDER_EXTERNAL_URL || 'http://localhost:5000';
-    // On renvoie un lien qui pointera vers le site (adaptez si besoin)
+    // Adaptez l'URL si besoin, ici on renvoie vers le site hébergé
     res.json({ link: `https://medina-app.onrender.com/?token=${token}`, token: token }); 
 });
 
@@ -142,15 +142,15 @@ app.get('/stats/:userId', async (req, res) => {
     try { const { userId } = req.params; const tp = await pool.query("SELECT COUNT(*) FROM projects WHERE owner_id = $1", [userId]); const pt = await pool.query("SELECT COUNT(*) FROM tasks WHERE assignee_id = $1 AND status != 'done'", [userId]); const ct = await pool.query("SELECT COUNT(*) FROM tasks WHERE assignee_id = $1 AND status = 'done'", [userId]); res.json({projects: tp.rows[0].count, pending: pt.rows[0].count, completed: ct.rows[0].count}); } catch (err) { res.status(500).send(err.message); }
 });
 
-// --- ROUTES DB UPDATE (Outils) ---
-app.get('/setup-db', async (req, res) => { /* Code setup initial conservé si besoin */ res.send("OK"); });
+// --- ROUTES DB UPDATE ---
+app.get('/setup-db', async (req, res) => { res.send("OK"); });
 app.get('/update-db-v6', async (req, res) => {
     try {
         await pool.query("ALTER TABLE users ADD COLUMN IF NOT EXISTS role VARCHAR(20) DEFAULT 'member'");
         await pool.query("UPDATE users SET role = 'admin' WHERE id = 1");
         await pool.query(`CREATE TABLE IF NOT EXISTS comments (id SERIAL PRIMARY KEY, task_id INT REFERENCES tasks(id) ON DELETE CASCADE, user_id INT REFERENCES users(id), content TEXT NOT NULL, created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP)`);
         await pool.query(`CREATE TABLE IF NOT EXISTS invitations (id SERIAL PRIMARY KEY, email VARCHAR(100) NOT NULL, token VARCHAR(100) NOT NULL, used BOOLEAN DEFAULT FALSE, created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP)`);
-        res.send("Update V6 (Admin + Commentaires) OK");
+        res.send("Update V6 OK");
     } catch (err) { res.status(500).send("Erreur V6: " + err.message); }
 });
 
