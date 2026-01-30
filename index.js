@@ -54,11 +54,12 @@ app.get('/tasks/:projectId', async (req, res) => {
     const tasks = await pool.query("SELECT * FROM tasks WHERE project_id = $1 AND deleted_at IS NULL ORDER BY id DESC", [req.params.projectId]); 
     res.json(tasks.rows); 
 });
-app.post('/tasks', async (req, res) => { const { project_id, title } = req.body; const newTask = await pool.query("INSERT INTO tasks (project_id, title) VALUES ($1, $2) RETURNING *", [project_id, title]); res.json(newTask.rows[0]); });
-app.put('/tasks/:id', async (req, res) => { 
-    const { id } = req.params; const { title, description, status, priority, progress, due_date, assignee_id, attachment_url } = req.body; 
-    const update = await pool.query(`UPDATE tasks SET title=COALESCE($1,title), description=COALESCE($2,description), status=COALESCE($3,status), priority=COALESCE($4,priority), progress=COALESCE($5,progress), due_date=COALESCE($6,due_date), assignee_id=COALESCE($7,assignee_id), attachment_url=COALESCE($8,attachment_url) WHERE id=$9 RETURNING *`, [title, description, status, priority, progress, due_date, assignee_id, attachment_url, id]); 
-    res.json(update.rows[0]); 
+// CRÉATION TÂCHE (Avec start_date par défaut = aujourd'hui)
+app.post('/tasks', async (req, res) => { 
+    const { project_id, title } = req.body; 
+    // On met la date de début à aujourd'hui par défaut
+    const newTask = await pool.query("INSERT INTO tasks (project_id, title, start_date) VALUES ($1, $2, CURRENT_DATE) RETURNING *", [project_id, title]); 
+    res.json(newTask.rows[0]); 
 });
 
 // --- GESTION CORBEILLE (NOUVEAU) ---
@@ -80,6 +81,27 @@ app.put('/restore/:type/:id', async (req, res) => {
     
     await pool.query(`UPDATE ${type} SET deleted_at = NULL WHERE id = $1`, [id]);
     res.json({ message: "Restauré" });
+});
+// MISE À JOUR TÂCHE (Avec start_date)
+app.put('/tasks/:id', async (req, res) => { 
+    const { id } = req.params; 
+    const { title, description, status, priority, progress, start_date, due_date, assignee_id, attachment_url } = req.body; 
+    
+    const update = await pool.query(`
+        UPDATE tasks SET 
+        title=COALESCE($1,title), 
+        description=COALESCE($2,description), 
+        status=COALESCE($3,status), 
+        priority=COALESCE($4,priority), 
+        progress=COALESCE($5,progress), 
+        start_date=COALESCE($6,start_date), 
+        due_date=COALESCE($7,due_date), 
+        assignee_id=COALESCE($8,assignee_id), 
+        attachment_url=COALESCE($9,attachment_url) 
+        WHERE id=$10 RETURNING *`, 
+    [title, description, status, priority, progress, start_date, due_date, assignee_id, attachment_url, id]); 
+    
+    res.json(update.rows[0]); 
 });
 
 // 3. Supprimer DÉFINITIVEMENT
@@ -149,5 +171,16 @@ app.delete('/users/:id', async (req, res) => {
         res.json({ success: true });
     } catch (err) { res.status(500).send(err.message); }
 });
+
+// --- ROUTE MAJ V10 (GANTT - DATE DE DÉBUT) ---
+app.get('/update-db-v10', async (req, res) => {
+    try {
+        await pool.query("ALTER TABLE tasks ADD COLUMN IF NOT EXISTS start_date DATE");
+        // Pour ne pas avoir de bugs, on initialise la date de début = date de création pour les anciennes tâches
+        await pool.query("UPDATE tasks SET start_date = created_at::date WHERE start_date IS NULL");
+        res.send("Base de données prête pour la Chronologie !");
+    } catch (err) { res.status(500).send("Erreur V10: " + err.message); }
+});
+
 
 app.listen(PORT, () => console.log(`Server started on ${PORT}`));

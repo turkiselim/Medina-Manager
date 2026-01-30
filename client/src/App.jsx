@@ -1,38 +1,107 @@
 import { useEffect, useState } from 'react'
 import Login from './Login'
 
-// --- CONFIGURATION ---
-const API_URL = 'https://medina-api.onrender.com'; // <--- METTEZ VOTRE VRAI CODE RENDER ICI
+const API_URL = 'https://medina-api-xxxx.onrender.com'; // <--- VOTRE URL RENDER
 
-// --- VUE CORBEILLE ---
-function TrashView() {
-    const [items, setItems] = useState([]);
-    const loadTrash = () => { fetch(`${API_URL}/trash`).then(r=>r.json()).then(setItems).catch(console.error); };
-    useEffect(() => { loadTrash(); }, []);
-    const handleRestore = async (type, id) => { await fetch(`${API_URL}/restore/${type}/${id}`, { method:'PUT' }); loadTrash(); };
-    const handlePermanentDelete = async (type, id) => { if(!confirm("Irréversible. Confirmer ?")) return; await fetch(`${API_URL}/permanent/${type}/${id}`, { method:'DELETE' }); loadTrash(); };
+// --- COMPOSANT VUE CHRONOLOGIE (GANTT SIMPLIFIÉ) ---
+function GanttView({ tasks, onEditTask }) {
+    // 1. Calculer la plage de dates (Min et Max des tâches ou ce mois-ci)
+    const getDateRange = () => {
+        const dates = tasks.flatMap(t => [new Date(t.start_date || Date.now()), new Date(t.due_date || Date.now())]);
+        if (dates.length === 0) return { start: new Date(), end: new Date(new Date().setDate(new Date().getDate() + 30)) };
+        const min = new Date(Math.min(...dates));
+        const max = new Date(Math.max(...dates));
+        // On ajoute une marge de 5 jours avant/après
+        min.setDate(min.getDate() - 5);
+        max.setDate(max.getDate() + 10);
+        return { start: min, end: max };
+    };
+
+    const { start, end } = getDateRange();
+    
+    // Générer tous les jours entre start et end
+    const days = [];
+    for (let d = new Date(start); d <= end; d.setDate(d.getDate() + 1)) {
+        days.push(new Date(d));
+    }
+
+    // Helpers de positionnement
+    const getTaskStyle = (t) => {
+        const tStart = new Date(t.start_date || t.created_at || Date.now());
+        const tEnd = new Date(t.due_date || tStart);
+        if (tEnd < tStart) tEnd.setDate(tStart.getDate()); // Sécurité
+
+        const totalDays = days.length;
+        const dayWidth = 40; // Pixels par jour
+        
+        // Calcul du décalage (offset)
+        const diffTime = Math.abs(tStart - start);
+        const diffDays = Math.ceil(diffTime / (1000 * 60 * 60 * 24));
+        
+        // Calcul de la durée
+        const durationTime = Math.abs(tEnd - tStart);
+        const durationDays = Math.ceil(durationTime / (1000 * 60 * 60 * 24)) + 1; // +1 pour inclure le jour même
+
+        return {
+            left: `${diffDays * dayWidth}px`,
+            width: `${durationDays * dayWidth}px`,
+            backgroundColor: t.priority === 'high' ? '#ef4444' : t.priority === 'medium' ? '#f59e0b' : '#3b82f6',
+            position: 'absolute',
+            height: '24px',
+            borderRadius: '4px',
+            color: 'white',
+            fontSize: '11px',
+            padding: '4px 8px',
+            overflow: 'hidden',
+            whiteSpace: 'nowrap',
+            cursor: 'pointer',
+            top: '8px'
+        };
+    };
 
     return (
-        <div style={{padding:'40px'}}>
-            <h1 style={{color:'#ef4444'}}>🗑️ Corbeille</h1>
-            <div style={{marginTop:'20px'}}>
-                {items.length === 0 && <p style={{color:'#888'}}>Corbeille vide.</p>}
-                {items.map((item, idx) => (
-                    <div key={idx} style={{display:'flex', justifyContent:'space-between', alignItems:'center', background:'white', padding:'15px', borderBottom:'1px solid #eee'}}>
-                        <div><b>{item.title}</b> <span style={{fontSize:'12px', background:'#eee', padding:'2px 6px', borderRadius:'4px'}}>{item.type}</span></div>
-                        <div>
-                            <button onClick={()=>handleRestore(item.type, item.id)} style={{background:'#10b981', color:'white', border:'none', padding:'5px 10px', borderRadius:'4px', marginRight:'5px', cursor:'pointer'}}>Restaurer</button>
-                            <button onClick={()=>handlePermanentDelete(item.type, item.id)} style={{background:'#ef4444', color:'white', border:'none', padding:'5px 10px', borderRadius:'4px', cursor:'pointer'}}>X</button>
+        <div style={{overflowX: 'auto', background: 'white', border: '1px solid #e0e0e0', borderRadius: '8px', height: '100%', display:'flex', flexDirection:'column'}}>
+            
+            {/* EN-TÊTE CALENDRIER */}
+            <div style={{display: 'flex', borderBottom: '1px solid #eee', position: 'sticky', top: 0, background: '#f9f9f9', zIndex: 10}}>
+                <div style={{minWidth: '200px', padding: '10px', borderRight: '1px solid #eee', fontWeight: 'bold', position:'sticky', left:0, background:'#f9f9f9', zIndex:20}}>Tâche</div>
+                {days.map((day, i) => (
+                    <div key={i} style={{minWidth: '40px', padding: '10px 0', textAlign: 'center', borderRight: '1px solid #f0f0f0', fontSize: '10px', color: '#666'}}>
+                        <div style={{fontWeight:'bold'}}>{day.getDate()}</div>
+                        <div>{day.toLocaleDateString('fr-FR', {month:'short'})}</div>
+                    </div>
+                ))}
+            </div>
+
+            {/* LIGNES TÂCHES */}
+            <div style={{flex:1, overflowY:'auto'}}>
+                {tasks.map(t => (
+                    <div key={t.id} style={{display: 'flex', borderBottom: '1px solid #f5f5f5', height: '40px', alignItems: 'center', position: 'relative'}}>
+                        {/* Colonne Nom Fixe */}
+                        <div style={{minWidth: '200px', padding: '0 10px', borderRight: '1px solid #eee', fontSize: '13px', fontWeight: '500', whiteSpace: 'nowrap', overflow: 'hidden', textOverflow: 'ellipsis', position:'sticky', left:0, background:'white', zIndex:10, height:'100%', display:'flex', alignItems:'center'}}>
+                            {t.title}
+                        </div>
+                        
+                        {/* Zone Graphique */}
+                        <div style={{position: 'relative', flex: 1, height: '100%'}}>
+                            {/* Grille de fond */}
+                            <div style={{position: 'absolute', top: 0, left: 0, right: 0, bottom: 0, display: 'flex'}}>
+                                {days.map((_, i) => <div key={i} style={{minWidth: '40px', borderRight: '1px solid #f9f9f9', height: '100%'}}></div>)}
+                            </div>
+                            
+                            {/* Barre de tâche */}
+                            <div onClick={() => onEditTask(t)} style={getTaskStyle(t)} title={`${t.title} (${new Date(t.start_date).toLocaleDateString()} - ${new Date(t.due_date).toLocaleDateString()})`}>
+                                {t.title}
+                            </div>
                         </div>
                     </div>
                 ))}
             </div>
         </div>
-    )
+    );
 }
 
-// --- MODALE TÂCHE ---
-// --- MODALE TÂCHE (CORRIGÉE : Liste Global Staff) ---
+// --- MODALE TÂCHE (Avec START DATE) ---
 function TaskModal({ task, allUsers, currentUser, onClose, onUpdate, onDelete }) {
   const [formData, setFormData] = useState(task);
   const [subtasks, setSubtasks] = useState([]);
@@ -76,6 +145,7 @@ function TaskModal({ task, allUsers, currentUser, onClose, onUpdate, onDelete })
                 <div>
                     <label style={{fontWeight:'bold', color:'#475569', display:'block', marginBottom:'10px'}}>💬 Commentaires</label>
                     <div style={{background:'#f1f5f9', padding:'15px', borderRadius:'8px', maxHeight:'200px', overflowY:'auto', marginBottom:'10px'}}>
+                        {comments.length === 0 && <div style={{fontSize:'12px', color:'#aaa', textAlign:'center'}}>Aucun commentaire.</div>}
                         {comments.map(c => (<div key={c.id} style={{marginBottom:'10px', background:'white', padding:'8px', borderRadius:'6px', boxShadow:'0 1px 2px rgba(0,0,0,0.05)'}}><div style={{fontSize:'11px', fontWeight:'bold', color:'#3b82f6', marginBottom:'2px'}}>{c.username} <span style={{color:'#aaa', fontWeight:'normal'}}>{new Date(c.created_at).toLocaleString()}</span></div><div style={{fontSize:'13px'}}>{c.content}</div></div>))}
                     </div>
                     <form onSubmit={sendComment} style={{display:'flex', gap:'10px'}}><input value={newComment} onChange={e=>setNewComment(e.target.value)} placeholder="Écrire un commentaire..." style={{flex:1, padding:'8px', borderRadius:'6px', border:'1px solid #cbd5e1'}} /><button type="submit" style={{background:'#3b82f6', color:'white', border:'none', padding:'0 15px', borderRadius:'6px', cursor:'pointer'}}>Envoyer</button></form>
@@ -83,19 +153,12 @@ function TaskModal({ task, allUsers, currentUser, onClose, onUpdate, onDelete })
             </div>
             <div style={{flex:1, padding:'25px', background:'#f9fafb', display:'flex', flexDirection:'column', gap:'15px'}}>
                 <div><label style={{fontSize:'11px', fontWeight:'bold', color:'#64748b'}}>STATUT</label><select value={formData.status||'todo'} onChange={e=>setFormData({...formData, status: e.target.value})} style={{width:'100%', padding:'8px', borderRadius:'6px', border:'1px solid #cbd5e1'}}><option value="todo">À Faire</option><option value="doing">En Cours</option><option value="done">Terminé</option></select></div>
+                <div><label style={{fontSize:'11px', fontWeight:'bold', color:'#64748b'}}>ASSIGNÉ À</label><select value={formData.assignee_id || ''} onChange={e=>setFormData({...formData, assignee_id: e.target.value})} style={{width:'100%', padding:'8px', borderRadius:'6px', border:'1px solid #cbd5e1'}}><option value="">-- Personne --</option>{allUsers.map(m => (<option key={m.id} value={m.id}>{m.username}</option>))}</select></div>
                 
-                {/* --- CHANGEMENT ICI : UTILISATION DE LA LISTE GLOBALE 'allUsers' --- */}
-                <div>
-                    <label style={{fontSize:'11px', fontWeight:'bold', color:'#64748b'}}>ASSIGNÉ À</label>
-                    <select value={formData.assignee_id || ''} onChange={e=>setFormData({...formData, assignee_id: e.target.value})} style={{width:'100%', padding:'8px', borderRadius:'6px', border:'1px solid #cbd5e1'}}>
-                        <option value="">-- Personne --</option>
-                        {allUsers.map(m => (
-                            <option key={m.id} value={m.id}>{m.username} ({m.email})</option>
-                        ))}
-                    </select>
-                </div>
-
-                <div><label style={{fontSize:'11px', fontWeight:'bold', color:'#64748b'}}>ÉCHÉANCE</label><input type="date" value={formData.due_date ? formData.due_date.split('T')[0] : ''} onChange={e=>setFormData({...formData, due_date: e.target.value})} style={{width:'100%', padding:'8px', borderRadius:'6px', border:'1px solid #cbd5e1'}} /></div>
+                {/* NOUVEAU : DATE DE DÉBUT */}
+                <div><label style={{fontSize:'11px', fontWeight:'bold', color:'#64748b'}}>DATE DÉBUT</label><input type="date" value={formData.start_date ? formData.start_date.split('T')[0] : ''} onChange={e=>setFormData({...formData, start_date: e.target.value})} style={{width:'100%', padding:'8px', borderRadius:'6px', border:'1px solid #cbd5e1'}} /></div>
+                
+                <div><label style={{fontSize:'11px', fontWeight:'bold', color:'#64748b'}}>DATE FIN (ÉCHÉANCE)</label><input type="date" value={formData.due_date ? formData.due_date.split('T')[0] : ''} onChange={e=>setFormData({...formData, due_date: e.target.value})} style={{width:'100%', padding:'8px', borderRadius:'6px', border:'1px solid #cbd5e1'}} /></div>
                 <div><label style={{fontSize:'11px', fontWeight:'bold', color:'#64748b'}}>PRIORITÉ</label><select value={formData.priority||'medium'} onChange={e=>setFormData({...formData, priority:e.target.value})} style={{width:'100%', padding:'8px', borderRadius:'6px', border:'1px solid #cbd5e1'}}><option value="low">🟢 Basse</option><option value="medium">🟡 Moyenne</option><option value="high">🔴 Haute</option></select></div>
                 <div><label style={{fontSize:'11px', fontWeight:'bold', color:'#64748b'}}>PIÈCE JOINTE</label><div style={{display:'flex', alignItems:'center', gap:'10px', marginTop:'5px'}}><label style={{padding:'6px 10px', border:'1px solid #cbd5e1', borderRadius:'6px', cursor:'pointer', background:'white', fontSize:'12px'}}>📎 Upload<input type="file" onChange={handleFileUpload} style={{display:'none'}} /></label>{formData.attachment_url && <a href={formData.attachment_url} target="_blank" style={{color:'#3b82f6', fontSize:'12px'}}>📄 Voir</a>}</div></div>
                 <div style={{marginTop:'auto', paddingTop:'20px'}}><button onClick={handleSaveMain} style={{width:'100%', padding:'10px', background:'#3b82f6', color:'white', border:'none', borderRadius:'6px', cursor:'pointer', fontWeight:'bold'}}>Enregistrer</button></div>
@@ -106,7 +169,33 @@ function TaskModal({ task, allUsers, currentUser, onClose, onUpdate, onDelete })
   );
 }
 
-// --- DASHBOARD (C'EST LA PIÈCE QUI MANQUAIT !) ---
+// --- VUE CORBEILLE ---
+function TrashView() {
+    const [items, setItems] = useState([]);
+    const loadTrash = () => { fetch(`${API_URL}/trash`).then(r=>r.json()).then(setItems).catch(console.error); };
+    useEffect(() => { loadTrash(); }, []);
+    const handleRestore = async (type, id) => { await fetch(`${API_URL}/restore/${type}/${id}`, { method:'PUT' }); loadTrash(); };
+    const handlePermanentDelete = async (type, id) => { if(!confirm("Irréversible. Confirmer ?")) return; await fetch(`${API_URL}/permanent/${type}/${id}`, { method:'DELETE' }); loadTrash(); };
+    return (
+        <div style={{padding:'40px'}}>
+            <h1 style={{color:'#ef4444'}}>🗑️ Corbeille</h1>
+            <div style={{marginTop:'20px'}}>
+                {items.length === 0 && <p style={{color:'#888'}}>Corbeille vide.</p>}
+                {items.map((item, idx) => (
+                    <div key={idx} style={{display:'flex', justifyContent:'space-between', alignItems:'center', background:'white', padding:'15px', borderBottom:'1px solid #eee'}}>
+                        <div><b>{item.title}</b> <span style={{fontSize:'12px', background:'#eee', padding:'2px 6px', borderRadius:'4px'}}>{item.type}</span></div>
+                        <div>
+                            <button onClick={()=>handleRestore(item.type, item.id)} style={{background:'#10b981', color:'white', border:'none', padding:'5px 10px', borderRadius:'4px', marginRight:'5px', cursor:'pointer'}}>Restaurer</button>
+                            <button onClick={()=>handlePermanentDelete(item.type, item.id)} style={{background:'#ef4444', color:'white', border:'none', padding:'5px 10px', borderRadius:'4px', cursor:'pointer'}}>X</button>
+                        </div>
+                    </div>
+                ))}
+            </div>
+        </div>
+    )
+}
+
+// --- DASHBOARD ---
 function Dashboard({ user, onOpenProject }) {
     const [activity, setActivity] = useState([]);
     const [stats, setStats] = useState({ projects: 0, pending: 0, completed: 0 });
@@ -150,18 +239,13 @@ function Dashboard({ user, onOpenProject }) {
     )
 }
 
-// --// --- VUE PROJET (Corrigée pour passer allUsers) ---
+// --- VUE PROJET (Avec Gantt) ---
 function ProjectView({ project, tasks, members, allUsers, viewMode, setViewMode, onAddTask, onEditTask, onUpdateTask, onInvite, onDeleteProject, user }) {
     const [newTaskTitle, setNewTaskTitle] = useState("");
     const handleDragStart = (e, taskId) => e.dataTransfer.setData("taskId", taskId);
     const handleDragOver = (e) => e.preventDefault();
     const handleDrop = (e, newStatus) => { const id = e.dataTransfer.getData("taskId"); const task = tasks.find(t => t.id.toString() === id); if (task && task.status !== newStatus) onUpdateTask({ ...task, status: newStatus }); };
-
-    // Helper pour trouver le nom d'un user depuis la liste globale
-    const getUserName = (id) => {
-        const u = allUsers.find(u => u.id === id);
-        return u ? u.username : '-';
-    };
+    const getUserName = (id) => { const u = allUsers.find(u => u.id === id); return u ? u.username : '-'; };
 
     return (
         <div style={{padding:'30px', height:'100%', display:'flex', flexDirection:'column', background:'white'}}>
@@ -174,6 +258,7 @@ function ProjectView({ project, tasks, members, allUsers, viewMode, setViewMode,
                     <div style={{background:'white', border:'1px solid #ddd', borderRadius:'6px', display:'flex', padding:'2px'}}>
                         <button onClick={()=>setViewMode('board')} style={{padding:'6px 12px', border:'none', borderRadius:'4px', background: viewMode==='board'?'#eee':'white', cursor:'pointer', fontWeight: viewMode==='board'?'bold':'normal'}}>Kanban</button>
                         <button onClick={()=>setViewMode('list')} style={{padding:'6px 12px', border:'none', borderRadius:'4px', background: viewMode==='list'?'#eee':'white', cursor:'pointer', fontWeight: viewMode==='list'?'bold':'normal'}}>Liste</button>
+                        <button onClick={()=>setViewMode('timeline')} style={{padding:'6px 12px', border:'none', borderRadius:'4px', background: viewMode==='timeline'?'#eee':'white', cursor:'pointer', fontWeight: viewMode==='timeline'?'bold':'normal'}}>Chronologie</button>
                     </div>
                     {user.role === 'admin' && <button onClick={()=>onDeleteProject(project.id)} style={{background:'#fee2e2', color:'#ef4444', border:'none', padding:'6px 12px', borderRadius:'6px', cursor:'pointer'}}>🗑️ Supprimer</button>}
                 </div>
@@ -226,132 +311,53 @@ function ProjectView({ project, tasks, members, allUsers, viewMode, setViewMode,
                      </table>
                 </div>
             )}
+
+            {/* NOUVEAU : GANTT */}
+            {viewMode === 'timeline' && <GanttView tasks={tasks} onEditTask={onEditTask} />}
         </div>
     )
 }
-   
 
-// --- VUE MEMBRES (ANNUAIRE RH) ---
+// --- VUE MEMBRES ---
 function MembersView({ user }) {
     const [email, setEmail] = useState("");
     const [inviteLink, setInviteLink] = useState("");
     const [members, setMembers] = useState([]);
-
-    // Charger la liste des membres
-    const loadMembers = () => {
-        fetch(`${API_URL}/users`).then(r => r.json()).then(setMembers).catch(console.error);
-    };
-
+    const loadMembers = () => { fetch(`${API_URL}/users`).then(r => r.json()).then(setMembers).catch(console.error); };
     useEffect(() => { loadMembers(); }, []);
-
-    const handleInvite = async (e) => {
-        e.preventDefault();
-        const res = await fetch(`${API_URL}/admin/invite`, { method: 'POST', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify({ email }) });
-        const json = await res.json();
-        setInviteLink(json.link.replace('http://localhost:5000', 'https://medina-app.onrender.com'));
-    };
-
-    const changeRole = async (userId, newRole) => {
-        if (userId === user.id) { alert("Vous ne pouvez pas modifier vos propres droits ici."); return; }
-        const res = await fetch(`${API_URL}/users/${userId}/role`, { method: 'PUT', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify({ role: newRole }) });
-        if (res.ok) {
-            alert("Droits mis à jour !");
-            loadMembers(); // Rafraîchir la liste
-        }
-    };
-
-    const removeUser = async (userId) => {
-        if (!confirm("Voulez-vous vraiment retirer cet utilisateur de l'hôtel ?")) return;
-        await fetch(`${API_URL}/users/${userId}`, { method: 'DELETE' });
-        loadMembers();
-    };
+    const handleInvite = async (e) => { e.preventDefault(); const res = await fetch(`${API_URL}/admin/invite`, { method:'POST', headers:{'Content-Type':'application/json'}, body:JSON.stringify({email}) }); const json = await res.json(); setInviteLink(json.link.replace('http://localhost:5000', 'https://medina-app.onrender.com')); };
+    const changeRole = async (userId, newRole) => { if (userId === user.id) { alert("Vous ne pouvez pas modifier vos propres droits."); return; } await fetch(`${API_URL}/users/${userId}/role`, { method: 'PUT', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify({ role: newRole }) }); loadMembers(); };
+    const removeUser = async (userId) => { if (!confirm("Supprimer l'utilisateur ?")) return; await fetch(`${API_URL}/users/${userId}`, { method: 'DELETE' }); loadMembers(); };
 
     return (
-        <div style={{ padding: '40px', maxWidth: '1000px', margin: '0 auto' }}>
-            <h1 style={{ marginBottom: '30px' }}>Gestion des Ressources Humaines</h1>
-
-            <div style={{ display: 'grid', gridTemplateColumns: '1fr 2fr', gap: '30px' }}>
-                
-                {/* BLOC 1 : INVITER */}
-                <div style={{ background: 'white', padding: '25px', borderRadius: '10px', border: '1px solid #eee', height: 'fit-content' }}>
-                    <h3 style={{ marginTop: 0 }}>📩 Inviter un collaborateur</h3>
-                    <p style={{ fontSize: '13px', color: '#666' }}>Générez un lien unique pour permettre à un employé de créer son compte.</p>
-                    <form onSubmit={handleInvite} style={{ display: 'flex', gap: '10px', flexDirection: 'column', marginTop: '15px' }}>
-                        <input type="email" value={email} onChange={e => setEmail(e.target.value)} placeholder="email@medina.tn" style={{ padding: '10px', border: '1px solid #ccc', borderRadius: '6px' }} required />
-                        <button type="submit" style={{ padding: '10px', background: '#3b82f6', color: 'white', border: 'none', borderRadius: '6px', cursor: 'pointer', fontWeight: 'bold' }}>Générer le lien</button>
-                    </form>
-                    {inviteLink && <div style={{ marginTop: '15px', background: '#eff6ff', padding: '10px', borderRadius: '6px', border: '1px solid #bfdbfe', fontSize: '12px', wordBreak: 'break-all' }}><strong>Lien :</strong> {inviteLink}</div>}
+        <div style={{padding:'40px'}}>
+            <h1>Gestion des Ressources Humaines</h1>
+            <div style={{display:'grid', gridTemplateColumns:'1fr 2fr', gap:'30px'}}>
+                <div style={{background:'white', padding:'25px', borderRadius:'10px', border:'1px solid #eee', height:'fit-content'}}>
+                    <h3>📩 Inviter</h3>
+                    <form onSubmit={handleInvite} style={{display:'flex', gap:'10px', flexDirection:'column'}}><input type="email" value={email} onChange={e=>setEmail(e.target.value)} placeholder="email@medina.tn" style={{padding:'10px', border:'1px solid #ccc', borderRadius:'6px'}} required /><button type="submit" style={{padding:'10px', background:'#3b82f6', color:'white', border:'none', borderRadius:'6px', cursor:'pointer'}}>Générer Lien</button></form>
+                    {inviteLink && <div style={{marginTop:'15px', background:'#eff6ff', padding:'10px', borderRadius:'6px', fontSize:'12px', wordBreak:'break-all'}}>{inviteLink}</div>}
                 </div>
-
-                {/* BLOC 2 : LISTE DU PERSONNEL */}
-                <div style={{ background: 'white', padding: '25px', borderRadius: '10px', border: '1px solid #eee' }}>
-                    <h3 style={{ marginTop: 0 }}>👥 L'Équipe ({members.length})</h3>
-                    <div style={{ overflowX: 'auto' }}>
-                        <table style={{ width: '100%', borderCollapse: 'collapse', marginTop: '15px' }}>
-                            <thead>
-                                <tr style={{ borderBottom: '2px solid #f3f4f6', textAlign: 'left' }}>
-                                    <th style={{ padding: '10px', fontSize: '12px', color: '#888', textTransform: 'uppercase' }}>Nom</th>
-                                    <th style={{ padding: '10px', fontSize: '12px', color: '#888', textTransform: 'uppercase' }}>Email</th>
-                                    <th style={{ padding: '10px', fontSize: '12px', color: '#888', textTransform: 'uppercase' }}>Rôle / Droits</th>
-                                    <th style={{ padding: '10px', fontSize: '12px', color: '#888', textTransform: 'uppercase' }}>Action</th>
-                                </tr>
-                            </thead>
-                            <tbody>
-                                {members.map(m => (
-                                    <tr key={m.id} style={{ borderBottom: '1px solid #f9f9f9' }}>
-                                        <td style={{ padding: '15px 10px', fontWeight: '500' }}>
-                                            <div style={{ display: 'flex', alignItems: 'center', gap: '10px' }}>
-                                                <div style={{ width: '30px', height: '30px', borderRadius: '50%', background: m.role === 'admin' ? '#f06a6a' : '#3b82f6', color: 'white', display: 'flex', alignItems: 'center', justifyContent: 'center', fontWeight: 'bold', fontSize: '12px' }}>
-                                                    {m.username.charAt(0).toUpperCase()}
-                                                </div>
-                                                {m.username} {m.id === user.id && <span style={{ fontSize: '10px', color: '#aaa' }}>(Vous)</span>}
-                                            </div>
-                                        </td>
-                                        <td style={{ padding: '10px', color: '#666', fontSize: '14px' }}>{m.email}</td>
-                                        <td style={{ padding: '10px' }}>
-                                            <select 
-                                                value={m.role} 
-                                                onChange={(e) => changeRole(m.id, e.target.value)}
-                                                disabled={m.id === user.id} // On ne peut pas se modifier soi-même pour éviter de se bloquer
-                                                style={{ 
-                                                    padding: '5px 10px', 
-                                                    borderRadius: '20px', 
-                                                    border: '1px solid #e5e7eb', 
-                                                    background: m.role === 'admin' ? '#fef2f2' : '#eff6ff',
-                                                    color: m.role === 'admin' ? '#ef4444' : '#3b82f6',
-                                                    fontWeight: 'bold',
-                                                    fontSize: '12px',
-                                                    cursor: m.id === user.id ? 'not-allowed' : 'pointer'
-                                                }}
-                                            >
-                                                <option value="member">Membre (Lecture/Écriture)</option>
-                                                <option value="admin">Admin (Contrôle Total)</option>
-                                            </select>
-                                        </td>
-                                        <td style={{ padding: '10px' }}>
-                                            {m.id !== user.id && (
-                                                <button onClick={() => removeUser(m.id)} style={{ background: 'transparent', border: 'none', color: '#ef4444', cursor: 'pointer', fontSize: '18px' }} title="Supprimer">×</button>
-                                            )}
-                                        </td>
-                                    </tr>
-                                ))}
-                            </tbody>
-                        </table>
-                    </div>
+                <div style={{background:'white', padding:'25px', borderRadius:'10px', border:'1px solid #eee'}}>
+                    <h3>👥 L'Équipe ({members.length})</h3>
+                    <table style={{width:'100%', borderCollapse:'collapse', marginTop:'15px'}}>
+                        <thead><tr style={{borderBottom:'2px solid #f3f4f6', textAlign:'left'}}><th style={{padding:'10px'}}>Nom</th><th style={{padding:'10px'}}>Email</th><th style={{padding:'10px'}}>Rôle</th><th style={{padding:'10px'}}>Action</th></tr></thead>
+                        <tbody>{members.map(m => (<tr key={m.id} style={{borderBottom:'1px solid #f9f9f9'}}><td style={{padding:'15px 10px'}}>{m.username}</td><td style={{padding:'10px', color:'#666'}}>{m.email}</td><td style={{padding:'10px'}}><select value={m.role} onChange={(e) => changeRole(m.id, e.target.value)} disabled={m.id === user.id} style={{padding:'5px', borderRadius:'4px'}}><option value="member">Membre</option><option value="admin">Admin</option></select></td><td style={{padding:'10px'}}>{m.id !== user.id && <button onClick={() => removeUser(m.id)} style={{border:'none', background:'none', color:'red', cursor:'pointer'}}>×</button>}</td></tr>))}</tbody>
+                    </table>
                 </div>
             </div>
         </div>
     );
 }
 
-// --- APP PRINCIPALE ---
+// --- APP ---
 export default function App() {
   const [token, setToken] = useState(localStorage.getItem('hotel_token'));
-  const [user, setUser] = useState(() => { try { return JSON.parse(localStorage.getItem('hotel_user')); } catch { return null; } });
+  const [user, setUser] = useState(() => { try { const s = localStorage.getItem('hotel_user'); return s && s !== "undefined" ? JSON.parse(s) : null; } catch { return null; } });
   
   const [sites, setSites] = useState([]);
   const [projects, setProjects] = useState([]);
-  const [allUsers, setAllUsers] = useState([]); // <--- STOCKAGE GLOBAL DES UTILISATEURS
+  const [allUsers, setAllUsers] = useState([]);
   
   const [activeTab, setActiveTab] = useState('home');
   const [selectedProject, setSelectedProject] = useState(null);
@@ -366,21 +372,8 @@ export default function App() {
   const handleLogin = (tok, usr) => { setToken(tok); setUser(usr); localStorage.setItem('hotel_token', tok); localStorage.setItem('hotel_user', JSON.stringify(usr)); };
   const handleLogout = () => { setToken(null); setUser(null); localStorage.clear(); };
 
-  // Chargement initial (Sites, Projets ET UTILISATEURS)
-  const loadData = () => { 
-      Promise.all([
-          fetch(`${API_URL}/sites`).then(r=>r.json()), 
-          fetch(`${API_URL}/projects`).then(r=>r.json()),
-          fetch(`${API_URL}/users`).then(r=>r.json()) // <--- On charge tout le monde
-      ]).then(([s, p, u]) => { 
-          setSites(Array.isArray(s)?s:[]); 
-          setProjects(Array.isArray(p)?p:[]);
-          setAllUsers(Array.isArray(u)?u:[]); // <--- On stocke
-      }).catch(console.error); 
-  };
-  
+  const loadData = () => { Promise.all([fetch(`${API_URL}/sites`).then(r=>r.json()), fetch(`${API_URL}/projects`).then(r=>r.json()), fetch(`${API_URL}/users`).then(r=>r.json())]).then(([s, p, u]) => { setSites(Array.isArray(s)?s:[]); setProjects(Array.isArray(p)?p:[]); setAllUsers(Array.isArray(u)?u:[]); }).catch(console.error); };
   useEffect(() => { if (token) loadData(); }, [token]);
-
   useEffect(() => { if (selectedProject) { Promise.all([fetch(`${API_URL}/tasks/${selectedProject.id}`).then(r=>r.json()), fetch(`${API_URL}/projects/${selectedProject.id}/members`).then(r=>r.json())]).then(([t, m]) => { setProjectData({ tasks: Array.isArray(t)?t:[], members: Array.isArray(m)?m:[] }); }).catch(console.error); } }, [selectedProject]);
 
   const navToProject = (p) => { setSelectedProject(p); setActiveTab(`project-${p.id}`); };
@@ -401,26 +394,16 @@ export default function App() {
         <div className="sidebar" style={{width:'250px', flexShrink:0, overflowY:'auto', background:'#1e1f21', color:'white'}}>
             <div style={{padding:'20px', fontWeight:'bold', fontSize:'18px'}}>MedinaOS</div>
             <div style={{padding:'10px 20px', cursor:'pointer', background: activeTab==='home'?'rgba(255,255,255,0.1)':'transparent'}} onClick={()=>{setActiveTab('home'); setSelectedProject(null)}}>🏠 Accueil</div>
-            {user.role === 'admin' && (
-                <>
-                    <div style={{padding:'10px 20px', cursor:'pointer'}} onClick={()=>{setActiveTab('members'); setSelectedProject(null)}}>👥 Membres</div>
-                    <div style={{padding:'10px 20px', cursor:'pointer'}} onClick={()=>{setActiveTab('trash'); setSelectedProject(null)}}>🗑️ Corbeille</div>
-                </>
-            )}
+            {user.role === 'admin' && <div style={{padding:'10px 20px', cursor:'pointer'}} onClick={()=>{setActiveTab('members'); setSelectedProject(null)}}>👥 Membres</div>}
+            {user.role === 'admin' && <div style={{padding:'10px 20px', cursor:'pointer'}} onClick={()=>{setActiveTab('trash'); setSelectedProject(null)}}>🗑️ Corbeille</div>}
             
             {sites.map(site => (
                 <div key={site.id}>
-                    <div style={{padding:'10px 20px', display:'flex', justifyContent:'space-between', alignItems:'center', color:'#888', fontSize:'12px', textTransform:'uppercase', marginTop:'10px'}}>
-                        <span>{site.name}</span>
-                        {user.role === 'admin' && <div style={{display:'flex', gap:'5px'}}><button onClick={()=>setCreatingProjectForSite(creatingProjectForSite===site.id ? null : site.id)} style={{background:'none', border:'none', color:'#ccc', cursor:'pointer'}}>+</button><button onClick={()=>deleteSite(site.id)} style={{background:'none', border:'none', color:'#ef4444', cursor:'pointer'}}>x</button></div>}
-                    </div>
+                    <div style={{padding:'10px 20px', display:'flex', justifyContent:'space-between', alignItems:'center', color:'#888', fontSize:'12px', textTransform:'uppercase', marginTop:'10px'}}><span>{site.name}</span>{user.role === 'admin' && <div style={{display:'flex', gap:'5px'}}><button onClick={()=>setCreatingProjectForSite(creatingProjectForSite===site.id ? null : site.id)} style={{background:'none', border:'none', color:'#ccc', cursor:'pointer'}}>+</button><button onClick={()=>deleteSite(site.id)} style={{background:'none', border:'none', color:'#ef4444', cursor:'pointer'}}>x</button></div>}</div>
                     {creatingProjectForSite === site.id && <form onSubmit={(e)=>createProject(e, site.id)} style={{padding:'0 20px 10px'}}><input autoFocus placeholder="Nom..." value={newProjectName} onChange={e=>setNewProjectName(e.target.value)} style={{width:'100%', padding:'5px', background:'#333', border:'none', color:'white'}} /></form>}
-                    {projects.filter(p => p.site_id === site.id).map(p => (
-                        <div key={p.id} style={{padding:'8px 30px', cursor:'pointer', background: activeTab===`project-${p.id}`?'rgba(255,255,255,0.1)':'transparent'}} onClick={() => navToProject(p)}>{p.name}</div>
-                    ))}
+                    {projects.filter(p => p.site_id === site.id).map(p => (<div key={p.id} style={{padding:'8px 30px', cursor:'pointer', background: activeTab===`project-${p.id}`?'rgba(255,255,255,0.1)':'transparent'}} onClick={() => navToProject(p)}>{p.name}</div>))}
                 </div>
             ))}
-
             {user.role === 'admin' && <div style={{padding:'20px'}}><form onSubmit={createSite} style={{display:'flex'}}><input placeholder="+ Site" value={newSiteName} onChange={e=>setNewSiteName(e.target.value)} style={{width:'100%', padding:'5px', background:'#333', border:'none', color:'white'}} /><button style={{background:'#f06a6a', border:'none', color:'white'}}>></button></form></div>}
             <div style={{marginTop:'auto', padding:'20px'}}><button onClick={handleLogout} style={{width:'100%'}}>Déconnexion</button></div>
         </div>
@@ -430,20 +413,7 @@ export default function App() {
             {activeTab === 'members' && <MembersView user={user} />}
             {activeTab === 'trash' && <TrashView />}
             {activeTab.startsWith('project-') && selectedProject && (
-                <ProjectView 
-                    project={selectedProject} 
-                    tasks={projectData.tasks} 
-                    members={projectData.members} 
-                    allUsers={allUsers} // <--- ON PASSE TOUT LE MONDE
-                    viewMode={viewMode} 
-                    setViewMode={setViewMode} 
-                    onAddTask={createTask} 
-                    onEditTask={setEditingTask} 
-                    onUpdateTask={updateTask} 
-                    onDeleteProject={deleteProject} 
-                    onInvite={()=>setActiveTab('members')} 
-                    user={user} 
-                />
+                <ProjectView project={selectedProject} tasks={projectData.tasks} members={projectData.members} allUsers={allUsers} viewMode={viewMode} setViewMode={setViewMode} onAddTask={createTask} onEditTask={setEditingTask} onUpdateTask={updateTask} onDeleteProject={deleteProject} onInvite={()=>setActiveTab('members')} user={user} />
             )}
         </div>
     </div>
