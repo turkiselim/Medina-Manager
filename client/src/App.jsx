@@ -1,62 +1,50 @@
 import { useEffect, useState, useRef } from 'react'
 import Login from './Login'
 
-const API_URL = 'https://medina-api.onrender.com'; // <--- VÉRIFIEZ VOTRE URL !
+const API_URL = 'https://medina-api-xxxx.onrender.com'; // <--- VÉRIFIEZ VOTRE URL !
 
-// --- STYLE CSS MOBILE (TIROIR FLOTTANT) ---
-const mobileStyles = `
+// --- STYLE CSS INTELLIGENT (PC & MOBILE) ---
+const styles = `
+  /* --- PC PAR DÉFAUT --- */
+  .app-container { display: flex; height: 100vh; width: 100vw; overflow: hidden; }
+  .sidebar { width: 250px; flex-shrink: 0; overflow-y: auto; background: #1e1f21; color: white; z-index: 100; transition: transform 0.3s ease; }
+  .mobile-header { display: none; }
+  .menu-overlay { display: none; }
+  .main-content { flex: 1; overflow: hidden; background: white; position: relative; }
+  
+  /* Kanban PC : Colonnes de taille fixe */
+  .kanban-board { display: flex; gap: 15px; overflow-x: auto; height: 100%; align-items: flex-start; padding-bottom: 10px; }
+  .kanban-col { min-width: 300px; width: 300px; background: #f7f8f9; border-radius: 10px; padding: 15px; border: 1px solid #e0e0e0; flex-shrink: 0; }
+
+  /* --- MOBILE (ECRANS < 768px) --- */
   @media (max-width: 768px) {
-    /* Conteneur principal */
-    .app-container { flex-direction: column; overflow-x: hidden; }
+    .app-container { flex-direction: column; }
     
-    /* Header Mobile (Visible uniquement sur tel) */
-    .mobile-header { 
-        display: flex !important; 
-        position: fixed; 
-        top: 0; left: 0; right: 0; 
-        height: 60px; 
-        z-index: 900; 
-        box-shadow: 0 2px 5px rgba(0,0,0,0.1);
-    }
+    /* Header Mobile visible */
+    .mobile-header { display: flex !important; position: fixed; top: 0; left: 0; right: 0; height: 60px; z-index: 900; box-shadow: 0 2px 5px rgba(0,0,0,0.1); background: #1e1f21; color: white; align-items: center; justify-content: space-between; padding: 0 20px; }
 
-    /* La Sidebar devient un tiroir caché */
-    .sidebar { 
-        position: fixed !important;
-        top: 0; left: 0; bottom: 0;
-        width: 260px !important;
-        transform: translateX(-100%); /* Caché à gauche */
-        transition: transform 0.3s ease;
-        z-index: 1000;
-        box-shadow: 5px 0 15px rgba(0,0,0,0.3);
-    }
-    
-    /* Quand le menu est ouvert */
+    /* Sidebar cachée en mode "Tiroir" */
+    .sidebar { position: fixed; top: 0; left: 0; bottom: 0; transform: translateX(-100%); box-shadow: 5px 0 15px rgba(0,0,0,0.3); }
     .sidebar.open { transform: translateX(0); }
+    .menu-overlay { display: block; position: fixed; inset: 0; background: rgba(0,0,0,0.5); z-index: 90; }
 
-    /* Le contenu principal prend tout l'écran */
-    .main-content { 
-        margin-top: 60px; /* Pour ne pas être caché par le header */
-        width: 100% !important; 
-        flex: 1;
-    }
+    /* Ajustement contenu principal */
+    .main-content { margin-top: 60px; width: 100% !important; }
 
-    /* Ajustements Dashboard */
+    /* Kanban Mobile : Colonnes larges pour le doigt */
+    .kanban-col { min-width: 85vw; width: 85vw; }
+    
+    /* Stats Dashboard empilées */
     .dash-stats { flex-direction: column; }
-    .dash-header { padding: 20px !important; }
     
     /* Modale Plein Écran */
-    .task-modal { width: 100% !important; height: 100% !important; borderRadius: 0 !important; }
+    .task-modal { width: 100% !important; height: 100% !important; border-radius: 0 !important; }
     .task-modal-body { flex-direction: column; }
     .task-modal-left { border-right: none !important; border-bottom: 1px solid #eee; height: 50%; }
-    
-    /* Overlay sombre quand le menu est ouvert */
-    .menu-overlay {
-        position: fixed; inset: 0; background: rgba(0,0,0,0.5); z-index: 950;
-    }
   }
 `;
 
-// --- VUE CHRONOLOGIE (GANTT) ---
+// --- VUE CHRONOLOGIE ---
 function GanttView({ tasks, onEditTask }) {
     const scrollRef = useRef(null);
     const getRange = () => {
@@ -81,12 +69,7 @@ function GanttView({ tasks, onEditTask }) {
         <div style={{overflowX: 'auto', background: 'white', border: '1px solid #e0e0e0', borderRadius: '8px', height: '100%', display: 'flex', flexDirection: 'column'}} ref={scrollRef}>
             <div style={{display: 'flex', borderBottom: '1px solid #eee', position: 'sticky', top: 0, background: '#f9f9f9', zIndex: 10, minWidth:'fit-content'}}>
                 <div style={{minWidth: '150px', padding: '10px', borderRight: '1px solid #eee', position: 'sticky', left: 0, background: '#f9f9f9', zIndex: 20, fontWeight: 'bold', fontSize:'12px'}}>Tâche</div>
-                {days.map((d, i) => (
-                    <div key={i} style={{minWidth: '40px', padding: '10px 0', textAlign: 'center', borderRight: '1px solid #eee', fontSize: '10px', color: '#666', background: d.toDateString() === new Date().toDateString() ? '#e0f2fe' : 'transparent'}}>
-                        <div style={{fontWeight: 'bold'}}>{d.getDate()}</div>
-                        <div>{d.toLocaleDateString('fr', { month: 'short' })}</div>
-                    </div>
-                ))}
+                {days.map((d, i) => (<div key={i} style={{minWidth: '40px', padding: '10px 0', textAlign: 'center', borderRight: '1px solid #eee', fontSize: '10px', color: '#666', background: d.toDateString() === new Date().toDateString() ? '#e0f2fe' : 'transparent'}}><div style={{fontWeight: 'bold'}}>{d.getDate()}</div><div>{d.toLocaleDateString('fr', { month: 'short' })}</div></div>))}
             </div>
             <div style={{flex: 1, overflowY: 'auto', minWidth:'fit-content'}}>
                 {tasks.map(t => (
@@ -149,12 +132,18 @@ function TaskModal({ task, allUsers, currentUser, onClose, onUpdate, onDelete })
 function Dashboard({ user }) {
     const [activity, setActivity] = useState([]);
     const [stats, setStats] = useState({ projects: 0, pending: 0, completed: 0 });
+    const [error, setError] = useState(null);
     
     useEffect(() => {
         if (!user) return;
         const sUrl = user.role === 'admin' ? `${API_URL}/stats/global` : `${API_URL}/stats/${user.id}`;
         const aUrl = user.role === 'admin' ? `${API_URL}/activity/global` : `${API_URL}/users/${user.id}/activity`;
-        fetch(sUrl).then(r=>r.json()).then(setStats).catch(console.error);
+        
+        fetch(sUrl)
+            .then(r => { if(!r.ok) throw new Error("Stats HS"); return r.json(); })
+            .then(setStats)
+            .catch(() => setError("Veuillez mettre à jour le serveur (server/index.js)"));
+            
         fetch(aUrl).then(r=>r.json()).then(setActivity).catch(console.error);
     }, [user]);
 
@@ -165,6 +154,9 @@ function Dashboard({ user }) {
             <div style={{padding:'20px 20px 0'}}>
                 <div style={{color:'#666', fontSize:'14px'}}>{today}</div>
                 <div style={{fontSize:'24px', fontWeight:'bold', marginBottom:'20px'}}>Bonjour, {user?.username}</div>
+                
+                {error && <div style={{padding:'10px', background:'#fee2e2', color:'red', borderRadius:'6px', marginBottom:'20px'}}>⚠️ {error}</div>}
+
                 <div className="dash-stats" style={{display:'flex', gap:'10px'}}>
                     <div style={{background:'white', padding:'15px', borderRadius:'10px', flex:1, textAlign:'center', border:'1px solid #ddd', boxShadow:'0 2px 5px rgba(0,0,0,0.02)'}}>
                         <div style={{fontSize:'24px', fontWeight:'bold', color:'#333'}}>{stats.projects}</div><div style={{fontSize:'10px', color:'#888', fontWeight:'bold'}}>PROJETS</div>
@@ -195,7 +187,7 @@ function Dashboard({ user }) {
     )
 }
 
-// --- VUE MEMBRES (RESPONSIVE) ---
+// --- VUE MEMBRES ---
 function MembersView({ user }) {
     const [email, setEmail] = useState("");
     const [inviteLink, setInviteLink] = useState("");
@@ -223,7 +215,7 @@ function MembersView({ user }) {
     );
 }
 
-// --- VUE PROJET (RESPONSIVE) ---
+// --- VUE PROJET (KANBAN RÉPARÉ) ---
 function ProjectView({ project, tasks, members, allUsers, viewMode, setViewMode, onAddTask, onEditTask, onUpdateTask, onInvite, onDeleteProject, user }) {
     const [newTaskTitle, setNewTaskTitle] = useState("");
     const handleDragStart = (e, taskId) => e.dataTransfer.setData("taskId", taskId);
@@ -245,9 +237,9 @@ function ProjectView({ project, tasks, members, allUsers, viewMode, setViewMode,
             </div>
 
             {viewMode === 'board' && (
-                <div style={{display:'flex', gap:'15px', overflowX:'auto', height:'100%', alignItems:'flex-start', paddingBottom:'10px'}}>
+                <div className="kanban-board">
                     {['todo', 'doing', 'done'].map(status => (
-                        <div key={status} onDragOver={handleDragOver} onDrop={(e)=>handleDrop(e, status)} style={{minWidth:'280px', width:'85vw', background:'#f7f8f9', borderRadius:'10px', padding:'15px', border:'1px solid #e0e0e0', flexShrink:0}}>
+                        <div key={status} className="kanban-col" onDragOver={handleDragOver} onDrop={(e)=>handleDrop(e, status)}>
                             <div style={{fontWeight:'bold', marginBottom:'10px', textTransform:'uppercase', color:'#666', fontSize:'12px'}}>{status}</div>
                             {status === 'todo' && user.role === 'admin' && <form onSubmit={(e)=>{e.preventDefault(); onAddTask(newTaskTitle); setNewTaskTitle("");}}><input placeholder="+ Tâche" value={newTaskTitle} onChange={e=>setNewTaskTitle(e.target.value)} style={{width:'100%', padding:'10px', marginBottom:'10px', border:'1px solid white', borderRadius:'6px'}} /></form>}
                             <div style={{display:'flex', flexDirection:'column', gap:'10px'}}>
@@ -287,7 +279,7 @@ export default function App() {
   const [projectData, setProjectData] = useState({ tasks: [], members: [] });
   const [viewMode, setViewMode] = useState('board');
   const [editingTask, setEditingTask] = useState(null);
-  const [mobileMenuOpen, setMobileMenuOpen] = useState(false); // <--- ÉTAT MENU BURGER
+  const [mobileMenuOpen, setMobileMenuOpen] = useState(false);
   const [newSiteName, setNewSiteName] = useState("");
   const [newProjectName, setNewProjectName] = useState("");
   const [creatingProjectForSite, setCreatingProjectForSite] = useState(null);
@@ -295,7 +287,7 @@ export default function App() {
   const handleLogin = (tok, usr) => { setToken(tok); setUser(usr); localStorage.setItem('hotel_token', tok); localStorage.setItem('hotel_user', JSON.stringify(usr)); };
   const handleLogout = () => { setToken(null); setUser(null); localStorage.clear(); };
 
-  useEffect(() => { const style = document.createElement('style'); style.textContent = mobileStyles; document.head.appendChild(style); return () => document.head.removeChild(style); }, []);
+  useEffect(() => { const style = document.createElement('style'); style.textContent = styles; document.head.appendChild(style); return () => document.head.removeChild(style); }, []);
   const loadData = () => { Promise.all([fetch(`${API_URL}/sites`).then(r=>r.json()), fetch(`${API_URL}/projects`).then(r=>r.json()), fetch(`${API_URL}/users`).then(r=>r.json())]).then(([s, p, u]) => { setSites(Array.isArray(s)?s:[]); setProjects(Array.isArray(p)?p:[]); setAllUsers(Array.isArray(u)?u:[]); }).catch(console.error); };
   useEffect(() => { if (token) loadData(); }, [token]);
   useEffect(() => { if (selectedProject) { Promise.all([fetch(`${API_URL}/tasks/${selectedProject.id}`).then(r=>r.json()), fetch(`${API_URL}/projects/${selectedProject.id}/members`).then(r=>r.json())]).then(([t, m]) => { setProjectData({ tasks: Array.isArray(t)?t:[], members: Array.isArray(m)?m:[] }); }).catch(console.error); } }, [selectedProject]);
@@ -312,39 +304,33 @@ export default function App() {
   if (!token || !user) return <Login onLogin={handleLogin} />;
 
   return (
-    <div className="app-container" style={{display:'flex', height:'100vh', width:'100vw'}}>
+    <div className="app-container">
         {editingTask && <TaskModal task={editingTask} allUsers={allUsers} currentUser={user} onClose={()=>setEditingTask(null)} onUpdate={updateTask} onDelete={deleteTask} />}
 
-        {/* HEADER MOBILE (NOUVEAU) */}
-        <div style={{display: 'none', padding:'15px', background:'#1e1f21', color:'white', alignItems:'center', justifyContent:'space-between'}} className="mobile-header">
+        {/* HEADER MOBILE */}
+        <div className="mobile-header">
             <span style={{fontWeight:'bold'}}>MedinaOS</span>
             <button onClick={()=>setMobileMenuOpen(!mobileMenuOpen)} style={{background:'none', border:'none', color:'white', fontSize:'24px'}}>☰</button>
         </div>
 
-        {/* OVERLAY SOMBRE QUAND MENU OUVERT */}
         {mobileMenuOpen && <div className="menu-overlay" onClick={()=>setMobileMenuOpen(false)}></div>}
 
-        {/* SIDEBAR FLOTTANTE */}
-        <div className={`sidebar ${mobileMenuOpen ? 'open' : ''}`} style={{width:'250px', flexShrink:0, overflowY:'auto', background:'#1e1f21', color:'white', zIndex:100}}>
-            <div className="sidebar-content">
-                <div style={{padding:'20px', fontWeight:'bold', fontSize:'18px'}}>MedinaOS</div>
-                <div style={{padding:'10px 20px', cursor:'pointer', background: activeTab==='home'?'rgba(255,255,255,0.1)':'transparent'}} onClick={()=>{setActiveTab('home'); setSelectedProject(null); setMobileMenuOpen(false);}}>🏠 Accueil</div>
-                {user.role === 'admin' && <><div style={{padding:'10px 20px', cursor:'pointer'}} onClick={()=>{setActiveTab('members'); setSelectedProject(null); setMobileMenuOpen(false);}}>👥 Membres</div><div style={{padding:'10px 20px', cursor:'pointer'}} onClick={()=>{setActiveTab('trash'); setSelectedProject(null); setMobileMenuOpen(false);}}>🗑️ Corbeille</div></>}
-                
-                {sites.map(site => (
-                    <div key={site.id}>
-                        <div style={{padding:'10px 20px', display:'flex', justifyContent:'space-between', color:'#888', fontSize:'12px', textTransform:'uppercase', marginTop:'10px'}}><span>{site.name}</span>{user.role === 'admin' && <div style={{display:'flex', gap:'5px'}}><button onClick={()=>setCreatingProjectForSite(creatingProjectForSite===site.id ? null : site.id)} style={{background:'none', border:'none', color:'#ccc', cursor:'pointer'}}>+</button><button onClick={()=>deleteSite(site.id)} style={{background:'none', border:'none', color:'#ef4444', cursor:'pointer'}}>x</button></div>}</div>
-                        {creatingProjectForSite === site.id && <form onSubmit={(e)=>createProject(e, site.id)} style={{padding:'0 20px 10px'}}><input autoFocus placeholder="Nom..." value={newProjectName} onChange={e=>setNewProjectName(e.target.value)} style={{width:'100%', padding:'5px', background:'#333', border:'none', color:'white'}} /></form>}
-                        {projects.filter(p => p.site_id === site.id).map(p => (<div key={p.id} style={{padding:'8px 30px', cursor:'pointer', background: activeTab===`project-${p.id}`?'rgba(255,255,255,0.1)':'transparent'}} onClick={() => navToProject(p)}>{p.name}</div>))}
-                    </div>
-                ))}
-                {user.role === 'admin' && <div style={{padding:'20px'}}><form onSubmit={createSite} style={{display:'flex'}}><input placeholder="+ Site" value={newSiteName} onChange={e=>setNewSiteName(e.target.value)} style={{width:'100%', padding:'5px', background:'#333', border:'none', color:'white'}} /><button style={{background:'#f06a6a', border:'none', color:'white'}}>></button></form></div>}
-                <div style={{marginTop:'auto', padding:'20px'}}><button onClick={handleLogout} style={{width:'100%'}}>Déconnexion</button></div>
-            </div>
+        <div className={`sidebar ${mobileMenuOpen ? 'open' : ''}`}>
+            <div style={{padding:'20px', fontWeight:'bold', fontSize:'18px'}}>MedinaOS</div>
+            <div style={{padding:'10px 20px', cursor:'pointer', background: activeTab==='home'?'rgba(255,255,255,0.1)':'transparent'}} onClick={()=>{setActiveTab('home'); setSelectedProject(null); setMobileMenuOpen(false);}}>🏠 Accueil</div>
+            {user.role === 'admin' && <><div style={{padding:'10px 20px', cursor:'pointer'}} onClick={()=>{setActiveTab('members'); setSelectedProject(null); setMobileMenuOpen(false);}}>👥 Membres</div><div style={{padding:'10px 20px', cursor:'pointer'}} onClick={()=>{setActiveTab('trash'); setSelectedProject(null); setMobileMenuOpen(false);}}>🗑️ Corbeille</div></>}
+            {sites.map(site => (
+                <div key={site.id}>
+                    <div style={{padding:'10px 20px', display:'flex', justifyContent:'space-between', color:'#888', fontSize:'12px', textTransform:'uppercase', marginTop:'10px'}}><span>{site.name}</span>{user.role === 'admin' && <div style={{display:'flex', gap:'5px'}}><button onClick={()=>setCreatingProjectForSite(creatingProjectForSite===site.id ? null : site.id)} style={{background:'none', border:'none', color:'#ccc', cursor:'pointer'}}>+</button><button onClick={()=>deleteSite(site.id)} style={{background:'none', border:'none', color:'#ef4444', cursor:'pointer'}}>x</button></div>}</div>
+                    {creatingProjectForSite === site.id && <form onSubmit={(e)=>createProject(e, site.id)} style={{padding:'0 20px 10px'}}><input autoFocus placeholder="Nom..." value={newProjectName} onChange={e=>setNewProjectName(e.target.value)} style={{width:'100%', padding:'5px', background:'#333', border:'none', color:'white'}} /></form>}
+                    {projects.filter(p => p.site_id === site.id).map(p => (<div key={p.id} style={{padding:'8px 30px', cursor:'pointer', background: activeTab===`project-${p.id}`?'rgba(255,255,255,0.1)':'transparent'}} onClick={() => navToProject(p)}>{p.name}</div>))}
+                </div>
+            ))}
+            {user.role === 'admin' && <div style={{padding:'20px'}}><form onSubmit={createSite} style={{display:'flex'}}><input placeholder="+ Site" value={newSiteName} onChange={e=>setNewSiteName(e.target.value)} style={{width:'100%', padding:'5px', background:'#333', border:'none', color:'white'}} /><button style={{background:'#f06a6a', border:'none', color:'white'}}>></button></form></div>}
+            <div style={{marginTop:'auto', padding:'20px'}}><button onClick={handleLogout} style={{width:'100%'}}>Déconnexion</button></div>
         </div>
 
-        {/* MAIN CONTENT */}
-        <div className="main-content" style={{flex:1, overflow:'hidden', background:'white', position:'relative'}}>
+        <div className="main-content">
             {activeTab === 'home' && <Dashboard user={user} onOpenProject={navToProject} />}
             {activeTab === 'members' && <MembersView user={user} />}
             {activeTab === 'trash' && <TrashView />}
@@ -352,4 +338,4 @@ export default function App() {
         </div>
     </div>
   )
-} 
+}
