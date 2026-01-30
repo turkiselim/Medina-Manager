@@ -444,3 +444,40 @@ app.get('/stats/:userId', async (req, res) => {
 app.listen(PORT, () => {
     console.log(`Serveur démarré sur http://localhost:${PORT}`);
 });
+
+// --- ROUTE MAJ V6 (RÔLES & COMMENTAIRES) ---
+app.get('/update-db-v6', async (req, res) => {
+    try {
+        // 1. Ajouter le RÔLE aux utilisateurs (Défaut : member)
+        await pool.query("ALTER TABLE users ADD COLUMN IF NOT EXISTS role VARCHAR(20) DEFAULT 'member'");
+        
+        // 2. Mettre l'utilisateur ID 1 (VOUS) en ADMIN
+        await pool.query("UPDATE users SET role = 'admin' WHERE id = 1");
+
+        // 3. Table des COMMENTAIRES
+        await pool.query(`
+            CREATE TABLE IF NOT EXISTS comments (
+                id SERIAL PRIMARY KEY,
+                task_id INT REFERENCES tasks(id) ON DELETE CASCADE,
+                user_id INT REFERENCES users(id),
+                content TEXT NOT NULL,
+                created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP
+            )
+        `);
+
+        // 4. Table des INVITATIONS (Pour sécuriser l'inscription)
+        await pool.query(`
+            CREATE TABLE IF NOT EXISTS invitations (
+                id SERIAL PRIMARY KEY,
+                email VARCHAR(100) NOT NULL,
+                token VARCHAR(100) NOT NULL,
+                used BOOLEAN DEFAULT FALSE,
+                created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP
+            )
+        `);
+
+        res.send("Système de Rôles et Commentaires installé ! Vous êtes Admin.");
+    } catch (err) {
+        res.status(500).send("Erreur V6: " + err.message);
+    }
+});
