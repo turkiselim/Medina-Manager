@@ -158,3 +158,21 @@ const PORT = process.env.PORT || 5000;
 app.listen(PORT, () => {
     console.log(`Serveur démarré sur le port ${PORT}`);
 });
+
+// --- DASHBOARD : FLUX D'ACTIVITÉ (Tout ce qui se passe dans mes projets) ---
+app.get('/users/:userId/activity', async (req, res) => {
+    try {
+        const { userId } = req.params;
+        const activity = await pool.query(`
+            SELECT t.*, p.name as project_name, u.username as assignee_name
+            FROM tasks t
+            JOIN projects p ON t.project_id = p.id
+            LEFT JOIN users u ON t.assignee_id = u.id
+            WHERE p.owner_id = $1
+            ORDER BY t.id DESC
+            LIMIT 10
+        `, [userId]);
+        res.json(activity.rows);
+    } catch (err) { res.status(500).send(err.message); }
+});
+
