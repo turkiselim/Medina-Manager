@@ -1,10 +1,47 @@
 import { useEffect, useState } from 'react'
 import Login from './Login'
 
-const API_URL = 'https://medina-api.onrender.com'; // <--- VOTRE URL RENDER ICI
+const API_URL = 'https://medina-api-xxxx.onrender.com'; // <--- VOTRE URL RENDER
 
-// --- MODALE TÂCHE (Standard) ---
-function TaskModal({ task, projectMembers, currentUser, onClose, onUpdate }) {
+// --- VUE CORBEILLE (NOUVEAU) ---
+function TrashView() {
+    const [items, setItems] = useState([]);
+
+    const loadTrash = () => { fetch(`${API_URL}/trash`).then(r=>r.json()).then(setItems).catch(console.error); };
+    useEffect(() => { loadTrash(); }, []);
+
+    const handleRestore = async (type, id) => { await fetch(`${API_URL}/restore/${type}/${id}`, { method:'PUT' }); loadTrash(); };
+    const handlePermanentDelete = async (type, id) => { 
+        if(!confirm("ATTENTION : Cette action est irréversible. Confirmer ?")) return;
+        await fetch(`${API_URL}/permanent/${type}/${id}`, { method:'DELETE' }); loadTrash(); 
+    };
+
+    return (
+        <div style={{padding:'40px'}}>
+            <h1 style={{color:'#ef4444'}}>🗑️ Corbeille</h1>
+            <p>Restaurez des éléments ou supprimez-les définitivement.</p>
+            <div style={{marginTop:'20px'}}>
+                {items.length === 0 && <p>La corbeille est vide.</p>}
+                {items.map((item, idx) => (
+                    <div key={idx} style={{display:'flex', justifyContent:'space-between', alignItems:'center', background:'white', padding:'15px', borderBottom:'1px solid #eee', marginBottom:'5px'}}>
+                        <div>
+                            <span style={{fontWeight:'bold'}}>{item.title}</span> 
+                            <span style={{fontSize:'12px', marginLeft:'10px', padding:'2px 6px', borderRadius:'4px', background:'#eee', textTransform:'uppercase'}}>{item.type}</span>
+                            <div style={{fontSize:'11px', color:'#aaa'}}>Supprimé le {new Date(item.deleted_at).toLocaleString()}</div>
+                        </div>
+                        <div style={{display:'flex', gap:'10px'}}>
+                            <button onClick={()=>handleRestore(item.type, item.id)} style={{background:'#10b981', color:'white', border:'none', padding:'5px 10px', borderRadius:'4px', cursor:'pointer'}}>Restaurer ♻️</button>
+                            <button onClick={()=>handlePermanentDelete(item.type, item.id)} style={{background:'#ef4444', color:'white', border:'none', padding:'5px 10px', borderRadius:'4px', cursor:'pointer'}}>Détruire ☠️</button>
+                        </div>
+                    </div>
+                ))}
+            </div>
+        </div>
+    )
+}
+
+// --- MODALE TÂCHE (Avec bouton suppression) ---
+function TaskModal({ task, projectMembers, currentUser, onClose, onUpdate, onDelete }) {
   const [formData, setFormData] = useState(task);
   const [subtasks, setSubtasks] = useState([]);
   const [comments, setComments] = useState([]);
@@ -28,40 +65,27 @@ function TaskModal({ task, projectMembers, currentUser, onClose, onUpdate }) {
       <div style={{background:'white', width:'900px', height:'90vh', borderRadius:'12px', display:'flex', flexDirection:'column', overflow:'hidden', boxShadow:'0 25px 50px -12px rgba(0,0,0,0.25)'}}>
         <div style={{padding:'20px', borderBottom:'1px solid #e2e8f0', display:'flex', justifyContent:'space-between', alignItems:'center'}}>
              <input value={formData.title} onChange={e=>setFormData({...formData, title:e.target.value})} style={{fontSize:'20px', fontWeight:'bold', border:'none', width:'100%', outline:'none'}} />
-             <button onClick={onClose} style={{background:'none', border:'none', fontSize:'24px', cursor:'pointer', color:'#64748b'}}>✕</button>
+             <div style={{display:'flex', gap:'10px'}}>
+                 {currentUser.role === 'admin' && <button onClick={() => { if(confirm("Mettre à la corbeille ?")) onDelete(task.id); }} style={{background:'#fee2e2', color:'#ef4444', border:'none', padding:'5px 10px', borderRadius:'4px', cursor:'pointer', fontWeight:'bold'}}>Supprimer</button>}
+                 <button onClick={onClose} style={{background:'none', border:'none', fontSize:'24px', cursor:'pointer', color:'#64748b'}}>✕</button>
+             </div>
         </div>
         <div style={{display:'flex', flex:1, overflow:'hidden'}}>
             <div style={{flex:2, padding:'25px', overflowY:'auto', borderRight:'1px solid #e2e8f0'}}>
                 <label style={{fontSize:'12px', fontWeight:'bold', color:'#94a3b8', textTransform:'uppercase'}}>Description</label>
                 <textarea value={formData.description||''} onChange={e=>setFormData({...formData, description:e.target.value})} rows="3" style={{width:'100%', padding:'10px', marginTop:'8px', marginBottom:'20px', border:'1px solid #e2e8f0', borderRadius:'6px'}} placeholder="Détails..." />
-                
                 <div style={{background:'#f8fafc', padding:'15px', borderRadius:'8px', border:'1px solid #e2e8f0', marginBottom:'20px'}}>
                     <label style={{fontWeight:'bold', color:'#475569', display:'block', marginBottom:'10px'}}>✅ Sous-tâches</label>
-                    {subtasks.map(st => (
-                        <div key={st.id} style={{display:'flex', alignItems:'center', gap:'10px', padding:'5px 0'}}>
-                            <input type="checkbox" checked={st.is_completed} onChange={(e)=>updateSubtask({...st, is_completed:e.target.checked})} style={{cursor:'pointer'}}/>
-                            <input value={st.title} onChange={(e)=>updateSubtask({...st, title:e.target.value})} style={{border:'none', background:'transparent', flex:1, textDecoration: st.is_completed?'line-through':'none', color: st.is_completed?'#94a3b8':'inherit'}} />
-                            <button onClick={()=>deleteSubtask(st.id)} style={{border:'none', background:'transparent', color:'#ef4444', cursor:'pointer'}}>×</button>
-                        </div>
-                    ))}
+                    {subtasks.map(st => (<div key={st.id} style={{display:'flex', alignItems:'center', gap:'10px', padding:'5px 0'}}><input type="checkbox" checked={st.is_completed} onChange={(e)=>updateSubtask({...st, is_completed:e.target.checked})} style={{cursor:'pointer'}}/><input value={st.title} onChange={(e)=>updateSubtask({...st, title:e.target.value})} style={{border:'none', background:'transparent', flex:1, textDecoration: st.is_completed?'line-through':'none', color: st.is_completed?'#94a3b8':'inherit'}} /><button onClick={()=>deleteSubtask(st.id)} style={{border:'none', background:'transparent', color:'#ef4444', cursor:'pointer'}}>×</button></div>))}
                     <form onSubmit={addSubtask}><input placeholder="+ Étape" value={newSubtaskTitle} onChange={e=>setNewSubtaskTitle(e.target.value)} style={{width:'100%', padding:'5px', border:'1px solid #cbd5e1', borderRadius:'4px', marginTop:'5px'}} /></form>
                 </div>
-
                 <div>
                     <label style={{fontWeight:'bold', color:'#475569', display:'block', marginBottom:'10px'}}>💬 Commentaires</label>
                     <div style={{background:'#f1f5f9', padding:'15px', borderRadius:'8px', maxHeight:'200px', overflowY:'auto', marginBottom:'10px'}}>
                         {comments.length === 0 && <div style={{fontSize:'12px', color:'#aaa', textAlign:'center'}}>Aucun commentaire.</div>}
-                        {comments.map(c => (
-                            <div key={c.id} style={{marginBottom:'10px', background:'white', padding:'8px', borderRadius:'6px', boxShadow:'0 1px 2px rgba(0,0,0,0.05)'}}>
-                                <div style={{fontSize:'11px', fontWeight:'bold', color:'#3b82f6', marginBottom:'2px'}}>{c.username} <span style={{color:'#aaa', fontWeight:'normal'}}>{new Date(c.created_at).toLocaleString()}</span></div>
-                                <div style={{fontSize:'13px'}}>{c.content}</div>
-                            </div>
-                        ))}
+                        {comments.map(c => (<div key={c.id} style={{marginBottom:'10px', background:'white', padding:'8px', borderRadius:'6px', boxShadow:'0 1px 2px rgba(0,0,0,0.05)'}}><div style={{fontSize:'11px', fontWeight:'bold', color:'#3b82f6', marginBottom:'2px'}}>{c.username} <span style={{color:'#aaa', fontWeight:'normal'}}>{new Date(c.created_at).toLocaleString()}</span></div><div style={{fontSize:'13px'}}>{c.content}</div></div>))}
                     </div>
-                    <form onSubmit={sendComment} style={{display:'flex', gap:'10px'}}>
-                        <input value={newComment} onChange={e=>setNewComment(e.target.value)} placeholder="Écrire un commentaire..." style={{flex:1, padding:'8px', borderRadius:'6px', border:'1px solid #cbd5e1'}} />
-                        <button type="submit" style={{background:'#3b82f6', color:'white', border:'none', padding:'0 15px', borderRadius:'6px', cursor:'pointer'}}>Envoyer</button>
-                    </form>
+                    <form onSubmit={sendComment} style={{display:'flex', gap:'10px'}}><input value={newComment} onChange={e=>setNewComment(e.target.value)} placeholder="Écrire un commentaire..." style={{flex:1, padding:'8px', borderRadius:'6px', border:'1px solid #cbd5e1'}} /><button type="submit" style={{background:'#3b82f6', color:'white', border:'none', padding:'0 15px', borderRadius:'6px', cursor:'pointer'}}>Envoyer</button></form>
                 </div>
             </div>
             <div style={{flex:1, padding:'25px', background:'#f9fafb', display:'flex', flexDirection:'column', gap:'15px'}}>
@@ -78,74 +102,8 @@ function TaskModal({ task, projectMembers, currentUser, onClose, onUpdate }) {
   );
 }
 
-// --- DASHBOARD (Avec activité globale) ---
-function Dashboard({ user, onOpenProject }) {
-    const [activity, setActivity] = useState([]);
-    const [stats, setStats] = useState({ projects: 0, pending: 0, completed: 0 });
-    const [recentProjects, setRecentProjects] = useState([]);
-
-    useEffect(() => {
-        if (!user) return;
-        fetch(`${API_URL}/users/${user.id}/activity`).then(res=>res.json()).then(setActivity).catch(console.error);
-        fetch(`${API_URL}/stats/${user.id}`).then(res=>res.json()).then(setStats).catch(console.error);
-        fetch(`${API_URL}/projects`).then(res=>res.json()).then(data => setRecentProjects(data.slice(0, 4))).catch(console.error);
-    }, [user]);
-
-    const today = new Date().toLocaleDateString('fr-FR', { weekday: 'long', year: 'numeric', month: 'long', day: 'numeric' });
-
-    return (
-        <div style={{overflowY:'auto', height:'100%', background:'#f8f9fa'}}>
-            <div className="dash-header">
-                <div className="date-sub">{today}</div>
-                <div className="greeting">Bonjour, {user.username}</div>
-                <div style={{display:'flex', gap:'20px', marginTop:'20px'}}>
-                    <div style={{background:'white', padding:'20px', borderRadius:'10px', border:'1px solid #e0e0e0', flex:1, textAlign:'center'}}>
-                        <div style={{fontSize:'32px', fontWeight:'bold', color:'#333'}}>{stats.pending}</div>
-                        <div style={{fontSize:'12px', color:'#888', textTransform:'uppercase', fontWeight:'bold'}}>Tâches à faire</div>
-                    </div>
-                    <div style={{background:'white', padding:'20px', borderRadius:'10px', border:'1px solid #e0e0e0', flex:1, textAlign:'center'}}>
-                        <div style={{fontSize:'32px', fontWeight:'bold', color:'#333'}}>{stats.projects}</div>
-                        <div style={{fontSize:'12px', color:'#888', textTransform:'uppercase', fontWeight:'bold'}}>Projets actifs</div>
-                    </div>
-                </div>
-            </div>
-
-            <div className="dash-grid">
-                <div className="widget-card">
-                    <div className="widget-header"><span>📢 Activité Globale (Hôtel)</span></div>
-                    <div style={{flex:1}}>
-                        {activity.length === 0 ? <div style={{padding:'20px', textAlign:'center', color:'#888'}}>Aucune activité. Créez votre premier projet !</div> : 
-                            activity.map(t => (
-                                <div key={t.id} className="task-row">
-                                    <div style={{width:'30px', height:'30px', background:'#eee', borderRadius:'50%', display:'flex', alignItems:'center', justifyContent:'center'}}>📝</div>
-                                    <div style={{flex:1}}>
-                                        <div style={{fontSize:'14px', fontWeight:'500'}}>{t.title}</div>
-                                        <div style={{fontSize:'11px', color:'#888'}}>Dans {t.project_name} • {t.status}</div>
-                                    </div>
-                                    <div style={{fontSize:'11px', color:'#aaa'}}>{new Date(t.created_at || Date.now()).toLocaleDateString()}</div>
-                                </div>
-                            ))
-                        }
-                    </div>
-                </div>
-                <div className="widget-card">
-                    <div className="widget-header"><span>📂 Projets Récents</span></div>
-                    <div style={{padding:'10px'}}>
-                        {recentProjects.map(p => (
-                            <div key={p.id} onClick={() => onOpenProject(p)} style={{padding:'10px', display:'flex', alignItems:'center', gap:'10px', cursor:'pointer', borderRadius:'6px'}} onMouseOver={e=>e.currentTarget.style.background='#f5f5f5'} onMouseOut={e=>e.currentTarget.style.background='white'}>
-                                <div style={{width:'32px', height:'32px', background: '#f06a6a', borderRadius:'6px', display:'flex', alignItems:'center', justifyContent:'center', color:'white', fontWeight:'bold'}}>{p.name.charAt(0).toUpperCase()}</div>
-                                <div style={{fontSize:'14px', fontWeight:'500'}}>{p.name}</div>
-                            </div>
-                        ))}
-                    </div>
-                </div>
-            </div>
-        </div>
-    )
-}
-
-// --- VUE PROJET (Kanban + Liste) ---
-function ProjectView({ project, tasks, members, viewMode, setViewMode, onAddTask, onEditTask, onUpdateTask, onInvite, user }) {
+// --- VUE PROJET ---
+function ProjectView({ project, tasks, members, viewMode, setViewMode, onAddTask, onEditTask, onUpdateTask, onInvite, onDeleteProject, user }) {
     const [newTaskTitle, setNewTaskTitle] = useState("");
     const handleDragStart = (e, taskId) => e.dataTransfer.setData("taskId", taskId);
     const handleDragOver = (e) => e.preventDefault();
@@ -156,14 +114,19 @@ function ProjectView({ project, tasks, members, viewMode, setViewMode, onAddTask
             <div style={{display:'flex', justifyContent:'space-between', alignItems:'center', marginBottom:'20px'}}>
                 <div style={{display:'flex', alignItems:'center', gap:'15px'}}>
                     <div style={{width:'40px', height:'40px', background:'#f06a6a', borderRadius:'8px', display:'flex', alignItems:'center', justifyContent:'center', color:'white', fontSize:'18px', fontWeight:'bold'}}>{project.name.charAt(0)}</div>
-                    <div><h1 style={{margin:0, fontSize:'20px'}}>{project.name}</h1><div style={{fontSize:'13px', color:'#888'}}>{members.length} membres</div></div>
+                    <div><h1 style={{margin:0, fontSize:'20px'}}>{project.name}</h1><div style={{fontSize:'13px', color:'#888'}}>Projet • {members.length} membres</div></div>
                 </div>
                 <div style={{display:'flex', gap:'10px'}}>
                     <div style={{background:'white', border:'1px solid #ddd', borderRadius:'6px', display:'flex', padding:'2px'}}>
-                        <button onClick={()=>setViewMode('board')} style={{padding:'6px 12px', border:'none', borderRadius:'4px', background: viewMode==='board'?'#eee':'white', cursor:'pointer', fontWeight: viewMode==='board'?'bold':'normal'}}>Kanban</button>
-                        <button onClick={()=>setViewMode('list')} style={{padding:'6px 12px', border:'none', borderRadius:'4px', background: viewMode==='list'?'#eee':'white', cursor:'pointer', fontWeight: viewMode==='list'?'bold':'normal'}}>Liste</button>
+                        <button onClick={()=>setViewMode('board')} style={{padding:'6px 12px', border:'none', borderRadius:'4px', background: viewMode==='board'?'#eee':'white', cursor:'pointer'}}>Kanban</button>
+                        <button onClick={()=>setViewMode('list')} style={{padding:'6px 12px', border:'none', borderRadius:'4px', background: viewMode==='list'?'#eee':'white', cursor:'pointer'}}>Liste</button>
                     </div>
-                    {user.role === 'admin' && <button onClick={onInvite} style={{background:'white', border:'1px solid #ddd', padding:'6px 12px', borderRadius:'6px', cursor:'pointer'}}>👤 Inviter</button>}
+                    {user.role === 'admin' && (
+                        <>
+                            <button onClick={onInvite} style={{background:'white', border:'1px solid #ddd', padding:'6px 12px', borderRadius:'6px', cursor:'pointer'}}>👤 Inviter</button>
+                            <button onClick={()=>onDeleteProject(project.id)} style={{background:'#fee2e2', color:'#ef4444', border:'none', padding:'6px 12px', borderRadius:'6px', cursor:'pointer'}}>🗑️ Supprimer Projet</button>
+                        </>
+                    )}
                 </div>
             </div>
 
@@ -188,7 +151,7 @@ function ProjectView({ project, tasks, members, viewMode, setViewMode, onAddTask
                                             <div style={{fontSize:'14px', marginBottom:'8px', fontWeight:'500'}}>{t.title}</div>
                                             <div style={{display:'flex', justifyContent:'space-between', alignItems:'center'}}>
                                                 <span style={{fontSize:'11px', color:'#888', background:'#f0f0f0', padding:'2px 6px', borderRadius:'4px'}}>{t.due_date ? new Date(t.due_date).toLocaleDateString().slice(0,5) : '-'}</span>
-                                                {assignee && <div className="avatar" style={{width:'24px', height:'24px', borderRadius:'50%', background:'#f06a6a', color:'white', display:'flex', alignItems:'center', justifyContent:'center', fontSize:'10px', fontWeight:'bold'}}>{assignee.username.charAt(0)}</div>}
+                                                {assignee && <div style={{width:'24px', height:'24px', borderRadius:'50%', background:'#f06a6a', color:'white', display:'flex', alignItems:'center', justifyContent:'center', fontSize:'10px', fontWeight:'bold'}}>{assignee.username.charAt(0)}</div>}
                                             </div>
                                         </div>
                                     )
@@ -225,14 +188,6 @@ function ProjectView({ project, tasks, members, viewMode, setViewMode, onAddTask
     )
 }
 
-// --- VUE MEMBRES ---
-function MembersView({ user }) {
-    const [email, setEmail] = useState("");
-    const [inviteLink, setInviteLink] = useState("");
-    const handleInvite = async (e) => { e.preventDefault(); const res = await fetch(`${API_URL}/admin/invite`, { method:'POST', headers:{'Content-Type':'application/json'}, body:JSON.stringify({email}) }); const json = await res.json(); setInviteLink(json.link.replace('http://localhost:5000', 'https://medina-app.onrender.com')); };
-    return (<div style={{padding:'40px'}}><h1>Membres</h1><div style={{background:'white', padding:'30px', borderRadius:'10px', border:'1px solid #eee', maxWidth:'500px'}}><form onSubmit={handleInvite}><input type="email" value={email} onChange={e=>setEmail(e.target.value)} placeholder="Email" style={{padding:'10px', width:'100%', marginBottom:'10px'}} /><button type="submit" style={{width:'100%', padding:'10px', background:'#10b981', color:'white', border:'none'}}>Générer</button></form>{inviteLink && <input readOnly value={inviteLink} style={{width:'100%', marginTop:'10px', padding:'10px'}} />}</div></div>);
-}
-
 // --- APP PRINCIPALE ---
 export default function App() {
   const [token, setToken] = useState(localStorage.getItem('hotel_token'));
@@ -244,126 +199,87 @@ export default function App() {
   const [projectData, setProjectData] = useState({ tasks: [], members: [] });
   const [viewMode, setViewMode] = useState('board');
   const [editingTask, setEditingTask] = useState(null);
-
-  // ÉTATS POUR LA CRÉATION
+  
   const [newSiteName, setNewSiteName] = useState("");
   const [newProjectName, setNewProjectName] = useState("");
-  const [creatingProjectForSite, setCreatingProjectForSite] = useState(null); // ID du site où on veut créer un projet
+  const [creatingProjectForSite, setCreatingProjectForSite] = useState(null);
 
   const handleLogin = (tok, usr) => { setToken(tok); setUser(usr); localStorage.setItem('hotel_token', tok); localStorage.setItem('hotel_user', JSON.stringify(usr)); };
   const handleLogout = () => { setToken(null); setUser(null); localStorage.removeItem('hotel_token'); localStorage.removeItem('hotel_user'); };
 
-  // Rechargement des données
-  const loadData = () => {
-    Promise.all([fetch(`${API_URL}/sites`).then(r=>r.json()), fetch(`${API_URL}/projects`).then(r=>r.json())])
-    .then(([s, p]) => { setSites(s); setProjects(p); });
-  };
+  const loadData = () => { Promise.all([fetch(`${API_URL}/sites`).then(r=>r.json()), fetch(`${API_URL}/projects`).then(r=>r.json())]).then(([s, p]) => { setSites(s); setProjects(p); }); };
   useEffect(() => { if (token) loadData(); }, [token]);
-
   useEffect(() => { if (selectedProject) { Promise.all([fetch(`${API_URL}/tasks/${selectedProject.id}`).then(r=>r.json()), fetch(`${API_URL}/projects/${selectedProject.id}/members`).then(r=>r.json())]).then(([t, m]) => { setProjectData({ tasks: t, members: m }); }); } }, [selectedProject]);
 
   const navToProject = (p) => { setSelectedProject(p); setActiveTab(`project-${p.id}`); };
   const createTask = async (title) => { const res = await fetch(`${API_URL}/tasks`, { method:'POST', headers:{'Content-Type':'application/json'}, body:JSON.stringify({project_id: selectedProject.id, title})}); const t = await res.json(); setProjectData({...projectData, tasks: [...projectData.tasks, t]}); };
   const updateTask = async (uT) => { setProjectData(prev => ({ ...prev, tasks: prev.tasks.map(t => t.id === uT.id ? uT : t) })); await fetch(`${API_URL}/tasks/${uT.id}`, { method: 'PUT', headers: {'Content-Type': 'application/json'}, body: JSON.stringify(uT) }); };
-
-  // --- ACTIONS DE CRÉATION DEPUIS LA SIDEBAR ---
-  const createSite = async (e) => {
-      e.preventDefault();
-      if(!newSiteName) return;
-      
-      try {
-          console.log("Tentative de création site:", newSiteName, "par", user.id); // Pour le debug
-          
-          const res = await fetch(`${API_URL}/sites`, {
-              method:'POST', 
-              headers:{'Content-Type':'application/json'}, 
-              body:JSON.stringify({name: newSiteName, owner_id: user.id})
-          });
-
-          if (!res.ok) {
-              const errorText = await res.text();
-              throw new Error(errorText); // Si le serveur dit non, on déclenche l'erreur
-          }
-
-          setNewSiteName(""); 
-          loadData(); // On recharge la liste
-          
-      } catch (err) {
-          alert("Erreur lors de la création : " + err.message);
-          console.error(err);
-      }
+  
+  // --- ACTIONS CORBEILLE ---
+  const deleteTask = async (taskId) => {
+      await fetch(`${API_URL}/recycle/tasks/${taskId}`, { method:'PUT' });
+      setProjectData(prev => ({ ...prev, tasks: prev.tasks.filter(t => t.id !== taskId) }));
+      setEditingTask(null);
+  };
+  const deleteProject = async (projId) => {
+      if(!confirm("Mettre ce projet à la corbeille ?")) return;
+      await fetch(`${API_URL}/recycle/projects/${projId}`, { method:'PUT' });
+      loadData(); setActiveTab('home'); setSelectedProject(null);
+  };
+  const deleteSite = async (siteId) => {
+      if(!confirm("Supprimer ce site et ses projets ?")) return;
+      await fetch(`${API_URL}/recycle/sites/${siteId}`, { method:'PUT' });
+      loadData();
   };
 
-  const createProject = async (e, siteId) => {
-      e.preventDefault(); if(!newProjectName) return;
-      const res = await fetch(`${API_URL}/projects`, { method:'POST', headers:{'Content-Type':'application/json'}, body:JSON.stringify({name: newProjectName, owner_id: user.id, site_id: siteId})});
-      const newProj = await res.json();
-      setNewProjectName(""); setCreatingProjectForSite(null); loadData(); navToProject(newProj);
-  };
+  const createSite = async (e) => { e.preventDefault(); if(!newSiteName) return; try { const res = await fetch(`${API_URL}/sites`, { method:'POST', headers:{'Content-Type':'application/json'}, body:JSON.stringify({name: newSiteName, owner_id: user.id})}); if(!res.ok) throw new Error(await res.text()); setNewSiteName(""); loadData(); } catch(err){ alert(err.message); } };
+  const createProject = async (e, siteId) => { e.preventDefault(); if(!newProjectName) return; const res = await fetch(`${API_URL}/projects`, { method:'POST', headers:{'Content-Type':'application/json'}, body:JSON.stringify({name: newProjectName, owner_id: user.id, site_id: siteId})}); const newProj = await res.json(); setNewProjectName(""); setCreatingProjectForSite(null); loadData(); navToProject(newProj); };
 
   if (!token) return <Login onLogin={handleLogin} />;
 
   return (
     <div style={{display:'flex', height:'100vh', width:'100vw'}}>
-        {editingTask && <TaskModal task={editingTask} projectMembers={projectData.members} currentUser={user} onClose={()=>setEditingTask(null)} onUpdate={updateTask} />}
+        {editingTask && <TaskModal task={editingTask} projectMembers={projectData.members} currentUser={user} onClose={()=>setEditingTask(null)} onUpdate={updateTask} onDelete={deleteTask} />}
 
         <div className="sidebar" style={{width:'250px', flexShrink:0, overflowY:'auto'}}>
             <div className="sidebar-header"><span style={{background:'#f06a6a', width:'24px', height:'24px', borderRadius:'6px', display:'inline-block', marginRight:'10px'}}></span>MedinaOS</div>
             <div className="sidebar-section">Général</div>
             <div className={`nav-item ${activeTab==='home'?'active':''}`} onClick={()=>{setActiveTab('home'); setSelectedProject(null)}}>🏠 Accueil</div>
-            {user.role === 'admin' && <div className={`nav-item ${activeTab==='members'?'active':''}`} onClick={()=>{setActiveTab('members'); setSelectedProject(null)}}>👥 Membres</div>}
-            
-            {/* LISTE DES SITES ET PROJETS */}
-            {sites.map(site => {
-                const sp = projects.filter(p => p.site_id === site.id);
-                return (
-                    <div key={site.id}>
-                        <div className="sidebar-section" style={{display:'flex', justifyContent:'space-between', alignItems:'center'}}>
-                            <span>🏢 {site.name}</span>
-                            {user.role === 'admin' && <button onClick={()=>setCreatingProjectForSite(creatingProjectForSite===site.id ? null : site.id)} style={{background:'none', border:'none', color:'#666', cursor:'pointer', fontWeight:'bold'}} title="Créer un projet ici">+</button>}
-                        </div>
-                        {/* FORMULAIRE CRÉATION PROJET (Si cliqué sur +) */}
-                        {creatingProjectForSite === site.id && (
-                            <form onSubmit={(e)=>createProject(e, site.id)} style={{padding:'0 20px 10px'}}>
-                                <input autoFocus placeholder="Nom du projet..." value={newProjectName} onChange={e=>setNewProjectName(e.target.value)} style={{width:'100%', padding:'5px', fontSize:'12px', background:'#333', border:'1px solid #555', color:'white', borderRadius:'4px'}} />
-                            </form>
-                        )}
-                        {/* LISTE DES PROJETS */}
-                        {sp.map(p => (
-                            <div key={p.id} className={`nav-item ${activeTab===`project-${p.id}`?'active':''}`} onClick={() => navToProject(p)}>
-                                <span style={{width:'8px', height:'8px', borderRadius:'50%', background: activeTab===`project-${p.id}`?'#f06a6a':'#666'}}></span>{p.name}
-                            </div>
-                        ))}
-                    </div>
-                );
-            })}
-
-            {/* FORMULAIRE CRÉATION SITE */}
             {user.role === 'admin' && (
-                <div style={{padding:'10px 20px', marginTop:'10px', borderTop:'1px solid #333'}}>
-                    <div className="sidebar-section" style={{marginTop:0, marginBottom:'5px'}}>NOUVEL ESPACE</div>
-                    <form onSubmit={createSite} style={{display:'flex', gap:'5px'}}>
-                        <input 
-                            placeholder="Nom (ex: Cuisine)" 
-                            value={newSiteName} 
-                            onChange={e=>setNewSiteName(e.target.value)} 
-                            style={{width:'100%', padding:'8px', background:'#222', border:'1px solid #444', color:'white', borderRadius:'4px', fontSize:'12px'}} 
-                        />
-                        <button type="submit" style={{background:'#f06a6a', border:'none', borderRadius:'4px', color:'white', cursor:'pointer', padding:'0 10px'}}>
-                            ➜
-                        </button>
-                    </form>
-                </div>
+                <>
+                    <div className={`nav-item ${activeTab==='members'?'active':''}`} onClick={()=>{setActiveTab('members'); setSelectedProject(null)}}>👥 Membres</div>
+                    <div className={`nav-item ${activeTab==='trash'?'active':''}`} onClick={()=>{setActiveTab('trash'); setSelectedProject(null)}}>🗑️ Corbeille</div>
+                </>
             )}
+            
+            {sites.map(site => (
+                <div key={site.id}>
+                    <div className="sidebar-section" style={{display:'flex', justifyContent:'space-between', alignItems:'center'}}>
+                        <span>🏢 {site.name}</span>
+                        {user.role === 'admin' && (
+                            <div style={{display:'flex', gap:'5px'}}>
+                                <button onClick={()=>setCreatingProjectForSite(creatingProjectForSite===site.id ? null : site.id)} style={{background:'none', border:'none', color:'#666', cursor:'pointer', fontWeight:'bold'}} title="Créer un projet">+</button>
+                                <button onClick={()=>deleteSite(site.id)} style={{background:'none', border:'none', color:'#ef4444', cursor:'pointer', fontSize:'10px'}}>x</button>
+                            </div>
+                        )}
+                    </div>
+                    {creatingProjectForSite === site.id && <form onSubmit={(e)=>createProject(e, site.id)} style={{padding:'0 20px 10px'}}><input autoFocus placeholder="Nom du projet..." value={newProjectName} onChange={e=>setNewProjectName(e.target.value)} style={{width:'100%', padding:'5px', fontSize:'12px', background:'#333', border:'1px solid #555', color:'white', borderRadius:'4px'}} /></form>}
+                    {projects.filter(p => p.site_id === site.id).map(p => (
+                        <div key={p.id} className={`nav-item ${activeTab===`project-${p.id}`?'active':''}`} onClick={() => navToProject(p)}><span style={{width:'8px', height:'8px', borderRadius:'50%', background: activeTab===`project-${p.id}`?'#f06a6a':'#666'}}></span>{p.name}</div>
+                    ))}
+                </div>
+            ))}
 
+            {user.role === 'admin' && <div style={{padding:'10px 20px', marginTop:'10px', borderTop:'1px solid #333'}}><div className="sidebar-section" style={{marginTop:0, marginBottom:'5px'}}>NOUVEL ESPACE</div><form onSubmit={createSite} style={{display:'flex', gap:'5px'}}><input placeholder="Nom (ex: Cuisine)" value={newSiteName} onChange={e=>setNewSiteName(e.target.value)} style={{width:'100%', padding:'8px', background:'#222', border:'1px solid #444', color:'white', borderRadius:'4px', fontSize:'12px'}} /><button type="submit" style={{background:'#f06a6a', border:'none', borderRadius:'4px', color:'white', cursor:'pointer', padding:'0 10px'}}>➜</button></form></div>}
             <div style={{marginTop:'auto', padding:'20px'}}><button onClick={handleLogout} style={{background:'transparent', border:'1px solid #444', color:'#aaa', width:'100%', padding:'8px', borderRadius:'6px', cursor:'pointer'}}>Déconnexion</button></div>
         </div>
 
         <div style={{flex:1, overflow:'hidden', background:'white'}}>
             {activeTab === 'home' && <Dashboard user={user} onOpenProject={navToProject} />}
             {activeTab === 'members' && <MembersView user={user} />}
+            {activeTab === 'trash' && <TrashView />}
             {activeTab.startsWith('project-') && selectedProject && (
-                <ProjectView project={selectedProject} tasks={projectData.tasks} members={projectData.members} viewMode={viewMode} setViewMode={setViewMode} onAddTask={createTask} onEditTask={setEditingTask} onUpdateTask={updateTask} onInvite={()=>setActiveTab('members')} user={user} />
+                <ProjectView project={selectedProject} tasks={projectData.tasks} members={projectData.members} viewMode={viewMode} setViewMode={setViewMode} onAddTask={createTask} onEditTask={setEditingTask} onUpdateTask={updateTask} onDeleteProject={deleteProject} onInvite={()=>setActiveTab('members')} user={user} />
             )}
         </div>
     </div>
