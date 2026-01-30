@@ -1,7 +1,7 @@
 import { useEffect, useState, useRef } from 'react'
 import Login from './Login'
 
-const API_URL = 'https://medina-api.onrender.com'; // <--- VÉRIFIEZ VOTRE URL !
+const API_URL = 'https://medina-api-xxxx.onrender.com'; // <--- VÉRIFIEZ VOTRE URL !
 
 // --- STYLE CSS MOBILE (TIROIR FLOTTANT) ---
 const mobileStyles = `
@@ -195,7 +195,7 @@ function Dashboard({ user }) {
     )
 }
 
-// --- VUE MEMBRES ---
+// --- VUE MEMBRES (RESPONSIVE) ---
 function MembersView({ user }) {
     const [email, setEmail] = useState("");
     const [inviteLink, setInviteLink] = useState("");
@@ -223,7 +223,7 @@ function MembersView({ user }) {
     );
 }
 
-// --- VUE PROJET ---
+// --- VUE PROJET (RESPONSIVE) ---
 function ProjectView({ project, tasks, members, allUsers, viewMode, setViewMode, onAddTask, onEditTask, onUpdateTask, onInvite, onDeleteProject, user }) {
     const [newTaskTitle, setNewTaskTitle] = useState("");
     const handleDragStart = (e, taskId) => e.dataTransfer.setData("taskId", taskId);
@@ -343,7 +343,7 @@ export default function App() {
             </div>
         </div>
 
-        {/* CONTENU PRINCIPAL */}
+        {/* MAIN CONTENT */}
         <div className="main-content" style={{flex:1, overflow:'hidden', background:'white', position:'relative'}}>
             {activeTab === 'home' && <Dashboard user={user} onOpenProject={navToProject} />}
             {activeTab === 'members' && <MembersView user={user} />}
