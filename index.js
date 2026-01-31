@@ -135,6 +135,40 @@ app.get('/activity/global', async (req, res) => { const a=await pool.query(`SELE
 app.get('/stats/:userId', async (req, res) => { const uid=req.params.userId; const tp=await pool.query("SELECT COUNT(*) FROM projects WHERE owner_id=$1 AND deleted_at IS NULL", [uid]); const pt=await pool.query("SELECT COUNT(*) FROM tasks WHERE assignee_id=$1 AND status!='done' AND deleted_at IS NULL", [uid]); const ct=await pool.query("SELECT COUNT(*) FROM tasks WHERE assignee_id=$1 AND status='done' AND deleted_at IS NULL", [uid]); res.json({projects:tp.rows[0].count, pending:pt.rows[0].count, completed:ct.rows[0].count}); });
 app.get('/users/:userId/activity', async (req, res) => { const a=await pool.query(`SELECT t.*, p.name as project_name, u.username as assignee_name FROM tasks t JOIN projects p ON t.project_id=p.id LEFT JOIN users u ON t.assignee_id=u.id WHERE (p.owner_id=$1 OR t.assignee_id=$1) AND t.deleted_at IS NULL ORDER BY t.created_at DESC LIMIT 10`, [req.params.userId]); res.json(a.rows); });
 
+// --- LISTES GLOBALES (POUR LE CLIC DASHBOARD) ---
+app.get('/global-tasks', async (req, res) => {
+    const { status, role, userId } = req.query;
+    let query = `
+        SELECT t.*, p.name as project_name, u.username as assignee_name 
+        FROM tasks t 
+        JOIN projects p ON t.project_id = p.id 
+        LEFT JOIN users u ON t.assignee_id = u.id 
+        WHERE t.deleted_at IS NULL
+    `;
+    const params = [];
+
+    // Filtre Statut
+    if (status === 'done') {
+        query += " AND t.status = 'done'";
+    } else if (status === 'todo') {
+        query += " AND t.status != 'done'";
+    }
+
+    // Filtre Rôle (Si pas admin, on ne voit que ses tâches)
+    if (role !== 'admin') {
+        params.push(userId);
+        query += " AND (t.assignee_id = $1 OR p.owner_id = $1)";
+    }
+
+    query += " ORDER BY t.due_date ASC";
+
+    try {
+        const result = await pool.query(query, params);
+        res.json(result.rows);
+    } catch (err) { res.status(500).send(err.message); }
+});
+
+
 // CORBEILLE & UPDATE
 app.put('/recycle/:type/:id', async (req, res) => { await pool.query(`UPDATE ${req.params.type} SET deleted_at=NOW() WHERE id=$1`, [req.params.id]); res.json({ok:true}); });
 app.put('/restore/:type/:id', async (req, res) => { await pool.query(`UPDATE ${req.params.type} SET deleted_at=NULL WHERE id=$1`, [req.params.id]); res.json({ok:true}); });
