@@ -86,50 +86,71 @@ app.put('/tasks/:id', async (req, res) => {
     res.json(u.rows[0]); 
 });
 
-// SUBTASKS
+// SUBTASKS & COMMENTS
 app.get('/tasks/:id/subtasks', async (req, res) => { const s = await pool.query("SELECT * FROM subtasks WHERE task_id=$1 ORDER BY id", [req.params.id]); res.json(s.rows); });
 app.post('/subtasks', async (req, res) => { const s = await pool.query("INSERT INTO subtasks (task_id, title) VALUES ($1, $2) RETURNING *", [req.body.task_id, req.body.title]); res.json(s.rows[0]); });
 app.put('/subtasks/:id', async (req, res) => { const s = await pool.query("UPDATE subtasks SET title=COALESCE($1,title), is_completed=COALESCE($2,is_completed) WHERE id=$3 RETURNING *", [req.body.title, req.body.is_completed, req.params.id]); res.json(s.rows[0]); });
 app.delete('/subtasks/:id', async (req, res) => { await pool.query("DELETE FROM subtasks WHERE id=$1", [req.params.id]); res.json({ok:true}); });
-
-// COMMENTS (UPDATED V16)
 app.get('/tasks/:id/comments', async (req, res) => { const c = await pool.query("SELECT c.*, u.username FROM comments c JOIN users u ON c.user_id=u.id WHERE c.task_id=$1 ORDER BY c.created_at DESC", [req.params.id]); res.json(c.rows); });
-app.post('/comments', async (req, res) => { 
-    // On accepte maintenant attachment_url
-    const { task_id, user_id, content, attachment_url } = req.body;
-    const c = await pool.query("INSERT INTO comments (task_id, user_id, content, attachment_url) VALUES ($1, $2, $3, $4) RETURNING *", [task_id, user_id, content, attachment_url]); 
-    const e = await pool.query("SELECT c.*, u.username FROM comments c JOIN users u ON c.user_id=u.id WHERE c.id=$1", [c.rows[0].id]); 
-    res.json(e.rows[0]); 
+app.post('/comments', async (req, res) => { const { task_id, user_id, content, attachment_url } = req.body; const c = await pool.query("INSERT INTO comments (task_id, user_id, content, attachment_url) VALUES ($1, $2, $3, $4) RETURNING *", [task_id, user_id, content, attachment_url]); const e = await pool.query("SELECT c.*, u.username FROM comments c JOIN users u ON c.user_id=u.id WHERE c.id=$1", [c.rows[0].id]); res.json(e.rows[0]); });
+
+// --- BUSINESS INTELLIGENCE DASHBOARD (NOUVEAU) ---
+app.get('/dashboard/advanced', async (req, res) => {
+    try {
+        // 1. Stats globales (Compteurs)
+        const total = await pool.query("SELECT COUNT(*) FROM tasks WHERE deleted_at IS NULL");
+        const done = await pool.query("SELECT COUNT(*) FROM tasks WHERE status = 'done' AND deleted_at IS NULL");
+        const pending = await pool.query("SELECT COUNT(*) FROM tasks WHERE status != 'done' AND deleted_at IS NULL");
+        const projects = await pool.query("SELECT COUNT(*) FROM projects WHERE deleted_at IS NULL");
+
+        // 2. Tâches Critiques (Haute priorité & Pas finies)
+        const critical = await pool.query(`
+            SELECT t.id, t.title, p.name as project_name, u.username as assignee_name, t.due_date 
+            FROM tasks t 
+            JOIN projects p ON t.project_id = p.id 
+            LEFT JOIN users u ON t.assignee_id = u.id 
+            WHERE t.priority = 'high' AND t.status != 'done' AND t.deleted_at IS NULL 
+            ORDER BY t.due_date ASC LIMIT 5
+        `);
+
+        // 3. Charge Équipe (Qui fait quoi)
+        const team = await pool.query(`
+            SELECT u.username, 
+                   COUNT(t.id) FILTER (WHERE t.status != 'done') as todo_count,
+                   COUNT(t.id) FILTER (WHERE t.status = 'done') as done_count
+            FROM users u 
+            LEFT JOIN tasks t ON u.id = t.assignee_id AND t.deleted_at IS NULL
+            GROUP BY u.id 
+            ORDER BY todo_count DESC 
+            LIMIT 5
+        `);
+
+        // 4. Activité Récente (Log)
+        const activity = await pool.query(`SELECT t.*, p.name as project_name, u.username as assignee_name FROM tasks t JOIN projects p ON t.project_id=p.id LEFT JOIN users u ON t.assignee_id=u.id WHERE t.deleted_at IS NULL ORDER BY t.created_at DESC LIMIT 10`);
+
+        res.json({
+            stats: { 
+                total: parseInt(total.rows[0].count), 
+                done: parseInt(done.rows[0].count),
+                pending: parseInt(pending.rows[0].count),
+                projects: parseInt(projects.rows[0].count)
+            },
+            critical: critical.rows,
+            team: team.rows,
+            activity: activity.rows
+        });
+    } catch (err) { res.status(500).send(err.message); }
 });
 
-// STATS & LISTS
-app.get('/stats/global', async (req, res) => { const tp=await pool.query("SELECT COUNT(*) FROM projects WHERE deleted_at IS NULL"); const pt=await pool.query("SELECT COUNT(*) FROM tasks WHERE status!='done' AND deleted_at IS NULL"); const ct=await pool.query("SELECT COUNT(*) FROM tasks WHERE status='done' AND deleted_at IS NULL"); res.json({projects:tp.rows[0].count, pending:pt.rows[0].count, completed:ct.rows[0].count}); });
-app.get('/activity/global', async (req, res) => { const a=await pool.query(`SELECT t.*, p.name as project_name, u.username as assignee_name FROM tasks t JOIN projects p ON t.project_id=p.id LEFT JOIN users u ON t.assignee_id=u.id WHERE t.deleted_at IS NULL ORDER BY t.created_at DESC LIMIT 15`); res.json(a.rows); });
-app.get('/stats/:userId', async (req, res) => { const uid=req.params.userId; const tp=await pool.query("SELECT COUNT(*) FROM projects WHERE owner_id=$1 AND deleted_at IS NULL", [uid]); const pt=await pool.query("SELECT COUNT(*) FROM tasks WHERE assignee_id=$1 AND status!='done' AND deleted_at IS NULL", [uid]); const ct=await pool.query("SELECT COUNT(*) FROM tasks WHERE assignee_id=$1 AND status='done' AND deleted_at IS NULL", [uid]); res.json({projects:tp.rows[0].count, pending:pt.rows[0].count, completed:ct.rows[0].count}); });
-app.get('/users/:userId/activity', async (req, res) => { const a=await pool.query(`SELECT t.*, p.name as project_name, u.username as assignee_name FROM tasks t JOIN projects p ON t.project_id=p.id LEFT JOIN users u ON t.assignee_id=u.id WHERE (p.owner_id=$1 OR t.assignee_id=$1) AND t.deleted_at IS NULL ORDER BY t.created_at DESC LIMIT 10`, [req.params.userId]); res.json(a.rows); });
-app.get('/global-tasks', async (req, res) => {
-    const { status, role, userId } = req.query;
-    let q = `SELECT t.*, p.name as p_name, u.username as u_name FROM tasks t JOIN projects p ON t.project_id=p.id LEFT JOIN users u ON t.assignee_id=u.id WHERE t.deleted_at IS NULL`;
-    const p = [];
-    if (status === 'done') q += " AND t.status = 'done'"; else if (status === 'todo') q += " AND t.status != 'done'";
-    if (role !== 'admin') { p.push(userId); q += " AND (t.assignee_id = $1 OR p.owner_id = $1)"; }
-    q += " ORDER BY t.due_date ASC";
-    const r = await pool.query(q, p); res.json(r.rows);
-});
+// LISTES
+app.get('/global-tasks', async (req, res) => { const { status, role, userId } = req.query; let q = `SELECT t.*, p.name as p_name, u.username as u_name FROM tasks t JOIN projects p ON t.project_id=p.id LEFT JOIN users u ON t.assignee_id=u.id WHERE t.deleted_at IS NULL`; const p = []; if (status === 'done') q += " AND t.status = 'done'"; else if (status === 'todo') q += " AND t.status != 'done'"; if (role !== 'admin') { p.push(userId); q += " AND (t.assignee_id = $1 OR p.owner_id = $1)"; } q += " ORDER BY t.due_date ASC"; const r = await pool.query(q, p); res.json(r.rows); });
 
 // TRASH & TOOLS
 app.put('/recycle/:type/:id', async (req, res) => { await pool.query(`UPDATE ${req.params.type} SET deleted_at=NOW() WHERE id=$1`, [req.params.id]); res.json({ok:true}); });
 app.put('/restore/:type/:id', async (req, res) => { await pool.query(`UPDATE ${req.params.type} SET deleted_at=NULL WHERE id=$1`, [req.params.id]); res.json({ok:true}); });
 app.delete('/permanent/:type/:id', async (req, res) => { await pool.query(`DELETE FROM ${req.params.type} WHERE id=$1`, [req.params.id]); res.json({ok:true}); });
 app.get('/trash', async (req, res) => { const s=await pool.query("SELECT id, name as title, 'sites' as type, deleted_at FROM sites WHERE deleted_at IS NOT NULL"); const p=await pool.query("SELECT id, name as title, 'projects' as type, deleted_at FROM projects WHERE deleted_at IS NOT NULL"); const t=await pool.query("SELECT id, title, 'tasks' as type, deleted_at FROM tasks WHERE deleted_at IS NOT NULL"); res.json([...s.rows, ...p.rows, ...t.rows]); });
-
-// ROUTE MAJ V16 (AJOUT ATTACHMENT AUX COMMENTS)
-app.get('/update-db-v16', async (req, res) => {
-    try {
-        await pool.query("ALTER TABLE comments ADD COLUMN IF NOT EXISTS attachment_url TEXT");
-        res.send("DB Update V16 OK : Commentaires prêts pour les photos !");
-    } catch (e) { res.status(500).send(e.message); }
-});
+app.get('/update-db-v16', async (req, res) => { try { await pool.query("ALTER TABLE comments ADD COLUMN IF NOT EXISTS attachment_url TEXT"); res.send("DB Update V16 OK"); } catch (e) { res.status(500).send(e.message); } });
 
 const PORT = process.env.PORT || 5000;
 app.listen(PORT, () => console.log(`Server ${PORT}`));
