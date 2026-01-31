@@ -153,4 +153,20 @@ app.get('/trash', async (req, res) => { const s=await pool.query("SELECT id, nam
 app.get('/update-db-v16', async (req, res) => { try { await pool.query("ALTER TABLE comments ADD COLUMN IF NOT EXISTS attachment_url TEXT"); res.send("DB Update V16 OK"); } catch (e) { res.status(500).send(e.message); } });
 
 const PORT = process.env.PORT || 5000;
+// --- SÉCURITÉ (TABLE INVITATIONS) ---
+app.get('/update-security', async (req, res) => {
+    try {
+        await pool.query(`
+            CREATE TABLE IF NOT EXISTS invitations (
+                id SERIAL PRIMARY KEY,
+                email TEXT NOT NULL,
+                token TEXT NOT NULL,
+                created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP
+            )
+        `);
+        res.send("Système de sécurité installé ! 🛡️");
+    } catch (e) { res.status(500).send(e.message); }
+});
+
+
 app.listen(PORT, () => console.log(`Server ${PORT}`));
