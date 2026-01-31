@@ -3,7 +3,7 @@ import Login from './Login'
 import jsPDF from 'jspdf'
 import autoTable from 'jspdf-autotable'
 
-const API_URL = 'https://medina-api.onrender.com'; // <--- VÉRIFIEZ VOTRE URL !
+const API_URL = 'https://medina-api.onrender.com'; // <--- URL RENDER
 
 const styles = `
   .app-container { display: flex; height: 100vh; width: 100vw; overflow: hidden; }
@@ -13,10 +13,12 @@ const styles = `
   .main-content { flex: 1; overflow: hidden; background: white; position: relative; }
   .kanban-board { display: flex; gap: 15px; overflow-x: auto; height: 100%; align-items: flex-start; padding-bottom: 10px; }
   .kanban-col { min-width: 300px; width: 300px; background: #f7f8f9; border-radius: 10px; padding: 15px; border: 1px solid #e0e0e0; flex-shrink: 0; }
-  
-  /* CARTES DASHBOARD CLIQUABLES */
   .stat-card { background: white; padding: 20px; border-radius: 10px; flex: 1; text-align: center; border: 1px solid #ddd; box-shadow: 0 2px 5px rgba(0,0,0,0.02); transition: transform 0.2s, box-shadow 0.2s; cursor: pointer; }
   .stat-card:hover { transform: translateY(-2px); box-shadow: 0 5px 15px rgba(0,0,0,0.1); border-color: #b0b0b0; }
+  
+  /* Style des commentaires */
+  .comment-bubble { padding: 10px; background: white; border-radius: 8px; margin-bottom: 10px; box-shadow: 0 1px 2px rgba(0,0,0,0.05); border: 1px solid #eee; }
+  .comment-img { max-width: 100%; max-height: 200px; border-radius: 6px; margin-top: 5px; display: block; border: 1px solid #ddd; cursor: pointer; }
 
   @media (max-width: 768px) {
     .app-container { flex-direction: column; }
@@ -55,38 +57,146 @@ function GanttView({ tasks, onEditTask }) {
     );
 }
 
+// --- MODALE TÂCHE (AVEC COMMENTAIRES MULTIMÉDIA) ---
 function TaskModal({ task, allUsers, currentUser, onClose, onUpdate, onDelete }) {
   const [formData, setFormData] = useState(task);
   const [subtasks, setSubtasks] = useState([]);
   const [comments, setComments] = useState([]);
-  const [newSub, setNewSub] = useState(""); const [newCom, setNewCom] = useState("");
+  const [newSub, setNewSub] = useState(""); 
+  
+  // États pour le commentaire
+  const [newCom, setNewCom] = useState("");
+  const [comFile, setComFile] = useState(null); // Fichier sélectionné pour le commentaire
+  const [isUploading, setIsUploading] = useState(false);
+
   useEffect(() => { fetch(`${API_URL}/tasks/${task.id}/subtasks`).then(r=>r.json()).then(setSubtasks); fetch(`${API_URL}/tasks/${task.id}/comments`).then(r=>r.json()).then(setComments); }, [task]);
+  
   const save = () => { onUpdate(formData); onClose(); };
   const addS = async (e) => { e.preventDefault(); if(!newSub) return; const res=await fetch(`${API_URL}/subtasks`, {method:'POST', headers:{'Content-Type':'application/json'}, body:JSON.stringify({task_id:task.id, title:newSub})}); setSubtasks([...subtasks, await res.json()]); setNewSub(""); };
   const upS = async (u) => { setSubtasks(subtasks.map(s=>s.id===u.id?u:s)); await fetch(`${API_URL}/subtasks/${u.id}`, {method:'PUT', headers:{'Content-Type':'application/json'}, body:JSON.stringify(u)}); };
   const delS = async (id) => { setSubtasks(subtasks.filter(s=>s.id!==id)); await fetch(`${API_URL}/subtasks/${id}`, {method:'DELETE'}); };
-  const sendC = async (e) => { e.preventDefault(); if(!newCom) return; const res=await fetch(`${API_URL}/comments`, {method:'POST', headers:{'Content-Type':'application/json'}, body:JSON.stringify({task_id:task.id, user_id:currentUser.id, content:newCom})}); setComments([await res.json(), ...comments]); setNewCom(""); };
+  
   const upF = async (e) => { const f=e.target.files[0]; if(!f) return; const d=new FormData(); d.append('file',f); const res=await fetch(`${API_URL}/upload`, {method:'POST', body:d}); const j=await res.json(); setFormData({...formData, attachment_url:j.url}); };
+
+  // ENVOI COMMENTAIRE (TEXTE + FICHIER)
+  const sendC = async (e) => { 
+      e.preventDefault(); 
+      if(!newCom && !comFile) return; 
+      setIsUploading(true);
+
+      let attachmentUrl = null;
+      if (comFile) {
+          const d = new FormData(); 
+          d.append('file', comFile);
+          try {
+              const res = await fetch(`${API_URL}/upload`, { method: 'POST', body: d });
+              const j = await res.json();
+              attachmentUrl = j.url;
+          } catch(err) { alert("Erreur upload image"); }
+      }
+
+      const res = await fetch(`${API_URL}/comments`, {
+          method:'POST', 
+          headers:{'Content-Type':'application/json'}, 
+          body:JSON.stringify({
+              task_id: task.id, 
+              user_id: currentUser.id, 
+              content: newCom,
+              attachment_url: attachmentUrl
+          })
+      }); 
+      
+      setComments([await res.json(), ...comments]); 
+      setNewCom(""); 
+      setComFile(null);
+      setIsUploading(false);
+  };
 
   return (
     <div style={{position:'fixed', inset:0, background:'rgba(0,0,0,0.6)', display:'flex', justifyContent:'center', alignItems:'center', zIndex:2000, backdropFilter:'blur(2px)'}}>
       <div className="task-modal" style={{background:'white', width:'900px', height:'90vh', borderRadius:'12px', display:'flex', flexDirection:'column', overflow:'hidden', boxShadow:'0 25px 50px -12px rgba(0,0,0,0.25)'}}>
+        
         <div style={{padding:'15px', borderBottom:'1px solid #e2e8f0', display:'flex', justifyContent:'space-between', alignItems:'center'}}>
              <input value={formData.title} onChange={e=>setFormData({...formData, title:e.target.value})} style={{fontSize:'18px', fontWeight:'bold', border:'none', width:'100%', outline:'none'}} />
              <div style={{display:'flex', gap:'10px'}}>{currentUser.role==='admin' && <button onClick={()=>{if(confirm("Corbeille ?")) onDelete(task.id)}} style={{background:'#fee2e2', color:'red', border:'none', padding:'5px', borderRadius:'4px'}}>🗑️</button>}<button onClick={onClose} style={{background:'none', border:'none', fontSize:'24px'}}>✕</button></div>
         </div>
+
         <div className="task-modal-body" style={{display:'flex', flex:1, overflow:'hidden'}}>
-            <div className="task-modal-left" style={{flex:2, padding:'20px', overflowY:'auto', borderRight:'1px solid #e2e8f0'}}>
-                <textarea value={formData.description||''} onChange={e=>setFormData({...formData, description:e.target.value})} rows="3" style={{width:'100%', padding:'10px', marginBottom:'20px', border:'1px solid #ddd', borderRadius:'6px'}} placeholder="Description..." />
-                <div style={{background:'#f8fafc', padding:'15px', borderRadius:'8px', marginBottom:'20px'}}><label style={{fontWeight:'bold', fontSize:'12px', color:'#888'}}>SOUS-TÂCHES</label>{subtasks.map(s=>(<div key={s.id} style={{display:'flex', alignItems:'center', gap:'10px', padding:'5px 0'}}><input type="checkbox" checked={s.is_completed} onChange={e=>upS({...s, is_completed:e.target.checked})}/><input value={s.title} onChange={e=>upS({...s, title:e.target.value})} style={{border:'none', background:'transparent', flex:1}}/><button onClick={()=>delS(s.id)} style={{border:'none', color:'red'}}>×</button></div>))}<form onSubmit={addS}><input placeholder="+ Étape" value={newSub} onChange={e=>setNewSub(e.target.value)} style={{width:'100%', padding:'5px', marginTop:'5px'}} /></form></div>
-                <div><label style={{fontWeight:'bold', fontSize:'12px', color:'#888'}}>COMMENTAIRES</label><div style={{background:'#f9f9f9', padding:'10px', borderRadius:'8px', maxHeight:'200px', overflowY:'auto', marginBottom:'10px'}}>{comments.map(c=>(<div key={c.id} style={{marginBottom:'8px', background:'white', padding:'8px', borderRadius:'6px'}}><div style={{fontSize:'11px', fontWeight:'bold', color:'#3b82f6'}}>{c.username}</div><div style={{fontSize:'13px'}}>{c.content}</div></div>))}</div><form onSubmit={sendC} style={{display:'flex', gap:'10px'}}><input value={newCom} onChange={e=>setNewCom(e.target.value)} placeholder="Écrire..." style={{flex:1, padding:'8px'}} /><button type="submit" style={{background:'#3b82f6', color:'white', border:'none', padding:'0 15px', borderRadius:'6px'}}>></button></form></div>
+            {/* GAUCHE : Description, Sous-tâches, Commentaires */}
+            <div className="task-modal-left" style={{flex:2, padding:'20px', overflowY:'auto', borderRight:'1px solid #e2e8f0', background:'#fff'}}>
+                
+                {/* Description */}
+                <textarea value={formData.description||''} onChange={e=>setFormData({...formData, description:e.target.value})} rows="3" style={{width:'100%', padding:'10px', marginBottom:'20px', border:'1px solid #ddd', borderRadius:'6px'}} placeholder="Ajouter une description..." />
+                
+                {/* Sous-tâches */}
+                <div style={{marginBottom:'20px'}}>
+                    <label style={{fontWeight:'bold', fontSize:'12px', color:'#888', marginBottom:'5px', display:'block'}}>SOUS-TÂCHES</label>
+                    {subtasks.map(s=>(<div key={s.id} style={{display:'flex', alignItems:'center', gap:'10px', padding:'5px 0'}}><input type="checkbox" checked={s.is_completed} onChange={e=>upS({...s, is_completed:e.target.checked})}/><input value={s.title} onChange={e=>upS({...s, title:e.target.value})} style={{border:'none', background:'transparent', flex:1, textDecoration:s.is_completed?'line-through':'none', color:s.is_completed?'#ccc':'inherit'}}/><button onClick={()=>delS(s.id)} style={{border:'none', color:'#ef4444'}}>×</button></div>))}
+                    <form onSubmit={addS}><input placeholder="+ Étape" value={newSub} onChange={e=>setNewSub(e.target.value)} style={{width:'100%', padding:'5px', marginTop:'5px', border:'1px dashed #ccc', borderRadius:'4px'}} /></form>
+                </div>
+
+                {/* Commentaires (Zone Chat) */}
+                <div style={{borderTop:'1px solid #eee', paddingTop:'20px'}}>
+                    <label style={{fontWeight:'bold', fontSize:'12px', color:'#888', marginBottom:'10px', display:'block'}}>DISCUSSION</label>
+                    
+                    {/* Liste des messages */}
+                    <div style={{background:'#f9f9f9', padding:'15px', borderRadius:'8px', maxHeight:'300px', overflowY:'auto', marginBottom:'15px', display:'flex', flexDirection:'column-reverse'}}>
+                        {comments.length === 0 && <div style={{textAlign:'center', color:'#aaa', fontSize:'12px'}}>Aucun message.</div>}
+                        {comments.map(c=>(
+                            <div key={c.id} className="comment-bubble">
+                                <div style={{fontSize:'11px', fontWeight:'bold', color:'#3b82f6', display:'flex', justifyContent:'space-between'}}>
+                                    {c.username}
+                                    <span style={{color:'#ccc', fontWeight:'normal'}}>{new Date(c.created_at).toLocaleDateString()} {new Date(c.created_at).toLocaleTimeString().slice(0,5)}</span>
+                                </div>
+                                <div style={{fontSize:'13px', marginTop:'2px', whiteSpace:'pre-wrap'}}>{c.content}</div>
+                                {c.attachment_url && (
+                                    c.attachment_url.match(/\.(jpeg|jpg|gif|png)$/) != null ? 
+                                    <img src={c.attachment_url} className="comment-img" onClick={()=>window.open(c.attachment_url, '_blank')} /> :
+                                    <a href={c.attachment_url} target="_blank" style={{display:'block', marginTop:'5px', fontSize:'12px', color:'#3b82f6'}}>📎 Voir la pièce jointe</a>
+                                )}
+                            </div>
+                        ))}
+                    </div>
+
+                    {/* Zone de saisie + Upload */}
+                    <form onSubmit={sendC} style={{display:'flex', gap:'10px', alignItems:'center'}}>
+                        <div style={{flex:1, position:'relative'}}>
+                            <input 
+                                value={newCom} 
+                                onChange={e=>setNewCom(e.target.value)} 
+                                placeholder="Écrire un message..." 
+                                style={{width:'100%', padding:'10px', borderRadius:'20px', border:'1px solid #ccc', paddingRight:'40px'}} 
+                            />
+                            {/* Bouton Trombone dans l'input */}
+                            <label style={{position:'absolute', right:'10px', top:'50%', transform:'translateY(-50%)', cursor:'pointer', color:'#888'}}>
+                                📎
+                                <input type="file" onChange={e=>setComFile(e.target.files[0])} style={{display:'none'}} />
+                            </label>
+                        </div>
+                        <button type="submit" disabled={isUploading} style={{background: isUploading ? '#ccc' : '#3b82f6', color:'white', border:'none', padding:'10px 15px', borderRadius:'50%', cursor:'pointer', width:'40px', height:'40px', display:'flex', alignItems:'center', justifyContent:'center'}}>
+                            {isUploading ? '...' : '➤'}
+                        </button>
+                    </form>
+                    {comFile && <div style={{fontSize:'11px', color:'#10b981', marginTop:'5px', marginLeft:'10px'}}>Image sélectionnée : {comFile.name} (Prêt à envoyer)</div>}
+                </div>
             </div>
+
+            {/* DROITE : Attributs */}
             <div style={{flex:1, padding:'20px', background:'#f9fafb', display:'flex', flexDirection:'column', gap:'15px', overflowY:'auto'}}>
                 <div><label style={{fontSize:'11px', fontWeight:'bold', color:'#888'}}>STATUT</label><select value={formData.status||'todo'} onChange={e=>setFormData({...formData, status:e.target.value})} style={{width:'100%', padding:'8px'}}><option value="todo">À Faire</option><option value="doing">En Cours</option><option value="done">Terminé</option></select></div>
                 <div><label style={{fontSize:'11px', fontWeight:'bold', color:'#888'}}>ASSIGNÉ À</label><select value={formData.assignee_id||''} onChange={e=>setFormData({...formData, assignee_id:e.target.value})} style={{width:'100%', padding:'8px'}}><option value="">--</option>{allUsers.map(u=>(<option key={u.id} value={u.id}>{u.username}</option>))}</select></div>
                 <div style={{display:'flex', gap:'10px'}}><div style={{flex:1}}><label style={{fontSize:'11px', fontWeight:'bold', color:'#888'}}>DÉBUT</label><input type="date" value={formData.start_date?formData.start_date.split('T')[0]:''} onChange={e=>setFormData({...formData, start_date:e.target.value})} style={{width:'100%', padding:'8px'}}/></div><div style={{flex:1}}><label style={{fontSize:'11px', fontWeight:'bold', color:'#888'}}>FIN</label><input type="date" value={formData.due_date?formData.due_date.split('T')[0]:''} onChange={e=>setFormData({...formData, due_date:e.target.value})} style={{width:'100%', padding:'8px'}}/></div></div>
-                <div><label style={{fontSize:'11px', fontWeight:'bold', color:'#888'}}>PIÈCE JOINTE</label><div style={{marginTop:'5px'}}><label style={{padding:'5px', border:'1px solid #ccc', cursor:'pointer', background:'white'}}>📎 Upload<input type="file" onChange={upF} style={{display:'none'}}/></label>{formData.attachment_url && <a href={formData.attachment_url} target="_blank" style={{marginLeft:'10px', color:'#3b82f6'}}>Voir</a>}</div></div>
-                <div style={{marginTop:'auto', paddingBottom:'20px'}}><button onClick={save} style={{width:'100%', padding:'12px', background:'#3b82f6', color:'white', border:'none', borderRadius:'6px', fontWeight:'bold'}}>Enregistrer</button></div>
+                
+                {/* Pièce jointe principale de la tâche (différent des commentaires) */}
+                <div>
+                    <label style={{fontSize:'11px', fontWeight:'bold', color:'#888'}}>DOCUMENT TÂCHE</label>
+                    <div style={{marginTop:'5px', display:'flex', alignItems:'center', gap:'5px'}}>
+                        <label style={{padding:'6px 10px', border:'1px solid #ccc', cursor:'pointer', background:'white', borderRadius:'4px', fontSize:'12px'}}>📎 Upload<input type="file" onChange={upF} style={{display:'none'}}/></label>
+                        {formData.attachment_url && <a href={formData.attachment_url} target="_blank" style={{color:'#3b82f6', fontSize:'12px'}}>Voir le fichier</a>}
+                    </div>
+                </div>
+
+                <div style={{marginTop:'auto', paddingBottom:'20px'}}><button onClick={save} style={{width:'100%', padding:'12px', background:'#3b82f6', color:'white', border:'none', borderRadius:'6px', fontWeight:'bold'}}>Enregistrer les modifications</button></div>
             </div>
         </div>
       </div>
@@ -94,24 +204,19 @@ function TaskModal({ task, allUsers, currentUser, onClose, onUpdate, onDelete })
   );
 }
 
-// --- DASHBOARD (CLIC -> NAVIGATION) ---
+// ... (Le reste du code Dashboard, MembersView, ProjectView, TrashView, App reste inchangé par rapport à la V15) ...
+// Je remets les composants inchangés pour que le copier-coller fonctionne direct.
+
 function Dashboard({ user, onNavigate }) {
     const [activity, setActivity] = useState([]); const [stats, setStats] = useState({ projects: 0, pending: 0, completed: 0 }); const [error, setError] = useState(null);
     useEffect(() => { if (!user) return; fetch(user.role==='admin'?`${API_URL}/stats/global`:`${API_URL}/stats/${user.id}`).then(r=>{if(!r.ok)throw new Error("HS");return r.json()}).then(setStats).catch(()=>setError("Update Server")); fetch(user.role==='admin'?`${API_URL}/activity/global`:`${API_URL}/users/${user.id}/activity`).then(r=>r.json()).then(setActivity).catch(console.error); }, [user]);
-    
     return (
         <div style={{overflowY:'auto', height:'100%', background:'#f8f9fa'}}>
             <div style={{padding:'20px 20px 0'}}><div style={{color:'#666', fontSize:'14px'}}>{new Date().toLocaleDateString('fr-FR')}</div><div style={{fontSize:'24px', fontWeight:'bold', marginBottom:'20px'}}>Bonjour, {user?.username}</div>{error && <div style={{padding:'10px', background:'#fee2e2', color:'red', borderRadius:'6px', marginBottom:'20px'}}>⚠️ {error}</div>}
                 <div className="dash-stats" style={{display:'flex', gap:'10px'}}>
-                    <div className="stat-card" onClick={() => onNavigate('global_projects')}>
-                        <div style={{fontSize:'24px', fontWeight:'bold', color:'#333'}}>{stats.projects}</div><div style={{fontSize:'10px', color:'#888', fontWeight:'bold'}}>PROJETS ACTIFS</div>
-                    </div>
-                    <div className="stat-card" onClick={() => onNavigate('global_tasks_todo')}>
-                        <div style={{fontSize:'24px', fontWeight:'bold', color:'#333'}}>{stats.pending}</div><div style={{fontSize:'10px', color:'#888', fontWeight:'bold'}}>TÂCHES EN COURS</div>
-                    </div>
-                    <div className="stat-card" onClick={() => onNavigate('global_tasks_done')}>
-                        <div style={{fontSize:'24px', fontWeight:'bold', color:'#10b981'}}>{stats.completed}</div><div style={{fontSize:'10px', color:'#888', fontWeight:'bold'}}>TERMINÉES</div>
-                    </div>
+                    <div className="stat-card" onClick={() => onNavigate('global_projects')}><div style={{fontSize:'24px', fontWeight:'bold', color:'#333'}}>{stats.projects}</div><div style={{fontSize:'10px', color:'#888', fontWeight:'bold'}}>PROJETS ACTIFS</div></div>
+                    <div className="stat-card" onClick={() => onNavigate('global_tasks_todo')}><div style={{fontSize:'24px', fontWeight:'bold', color:'#333'}}>{stats.pending}</div><div style={{fontSize:'10px', color:'#888', fontWeight:'bold'}}>TÂCHES EN COURS</div></div>
+                    <div className="stat-card" onClick={() => onNavigate('global_tasks_done')}><div style={{fontSize:'24px', fontWeight:'bold', color:'#10b981'}}>{stats.completed}</div><div style={{fontSize:'10px', color:'#888', fontWeight:'bold'}}>TERMINÉES</div></div>
                 </div>
             </div>
             <div style={{padding:'20px'}}><h3 style={{fontSize:'16px'}}>Activité Récente</h3>{activity.length===0?<p style={{color:'#888', fontStyle:'italic', fontSize:'13px'}}>Rien à signaler.</p>:activity.map(t=>(<div key={t.id} style={{background:'white', padding:'12px', borderBottom:'1px solid #eee', display:'flex', justifyContent:'space-between', alignItems:'center'}}><div style={{overflow:'hidden', textOverflow:'ellipsis', whiteSpace:'nowrap', maxWidth:'70%'}}><div style={{fontWeight:'500', fontSize:'14px'}}>{t.title}</div><div style={{fontSize:'11px', color:'#888'}}>{t.assignee_name||'?'} • {t.project_name}</div></div><div style={{fontSize:'10px', color:'#aaa'}}>{new Date(t.created_at).toLocaleDateString()}</div></div>))}</div>
@@ -119,60 +224,19 @@ function Dashboard({ user, onNavigate }) {
     )
 }
 
-// --- VUE LISTE GLOBALE (NOUVEAU) ---
 function GlobalListView({ type, user, onEditTask }) {
     const [items, setItems] = useState([]);
-    
     useEffect(() => {
-        if (type === 'projects') {
-            fetch(`${API_URL}/projects`).then(r => r.json()).then(setItems);
-        } else {
-            // type = 'todo' ou 'done'
-            const status = type === 'todo' ? 'todo' : 'done';
-            fetch(`${API_URL}/global-tasks?status=${status}&role=${user.role}&userId=${user.id}`)
-                .then(r => r.json())
-                .then(setItems)
-                .catch(console.error);
-        }
+        if (type === 'projects') { fetch(`${API_URL}/projects`).then(r => r.json()).then(setItems); } 
+        else { const status = type === 'todo' ? 'todo' : 'done'; fetch(`${API_URL}/global-tasks?status=${status}&role=${user.role}&userId=${user.id}`).then(r => r.json()).then(setItems).catch(console.error); }
     }, [type, user]);
-
     return (
         <div style={{padding:'20px', height:'100%', overflowY:'auto'}}>
-            <h2 style={{textTransform:'uppercase', fontSize:'18px', marginBottom:'20px', color:'#333'}}>
-                {type === 'projects' ? '📂 Tous les Projets' : type === 'todo' ? '🔥 Tâches en cours' : '✅ Tâches terminées'}
-            </h2>
-            <div style={{background:'white', borderRadius:'8px', border:'1px solid #eee', overflowX:'auto'}}>
-                <table style={{width:'100%', borderCollapse:'collapse', minWidth:'500px'}}>
-                    <thead style={{background:'#f9f9f9'}}>
-                        <tr>
-                            <th style={{padding:'10px', textAlign:'left', fontSize:'12px'}}>Nom / Titre</th>
-                            {type !== 'projects' && <th style={{padding:'10px', textAlign:'left', fontSize:'12px'}}>Projet</th>}
-                            {type !== 'projects' && <th style={{padding:'10px', textAlign:'left', fontSize:'12px'}}>Assigné à</th>}
-                            <th style={{padding:'10px', textAlign:'left', fontSize:'12px'}}>{type === 'projects' ? 'Site' : 'Échéance'}</th>
-                        </tr>
-                    </thead>
-                    <tbody>
-                        {items.map(item => (
-                            <tr key={item.id} onClick={() => type !== 'projects' && onEditTask(item)} style={{borderBottom:'1px solid #eee', cursor: type !== 'projects' ? 'pointer' : 'default'}}>
-                                <td style={{padding:'10px', fontSize:'13px', fontWeight:'500'}}>
-                                    {type === 'projects' ? item.name : item.title}
-                                </td>
-                                {type !== 'projects' && <td style={{padding:'10px', fontSize:'12px', color:'#666'}}>{item.project_name}</td>}
-                                {type !== 'projects' && <td style={{padding:'10px', fontSize:'12px', color:'#666'}}>{item.assignee_name || '-'}</td>}
-                                <td style={{padding:'10px', fontSize:'12px', color:'#888'}}>
-                                    {type === 'projects' ? 'Site #' + item.site_id : (item.due_date ? new Date(item.due_date).toLocaleDateString() : '-')}
-                                </td>
-                            </tr>
-                        ))}
-                    </tbody>
-                </table>
-                {items.length === 0 && <div style={{padding:'20px', textAlign:'center', color:'#888'}}>Aucun élément trouvé.</div>}
-            </div>
-        </div>
+            <h2 style={{textTransform:'uppercase', fontSize:'18px', marginBottom:'20px', color:'#333'}}>{type === 'projects' ? '📂 Tous les Projets' : type === 'todo' ? '🔥 Tâches en cours' : '✅ Tâches terminées'}</h2>
+            <div style={{background:'white', borderRadius:'8px', border:'1px solid #eee', overflowX:'auto'}}><table style={{width:'100%', borderCollapse:'collapse', minWidth:'500px'}}><thead style={{background:'#f9f9f9'}}><tr><th style={{padding:'10px', textAlign:'left', fontSize:'12px'}}>Nom / Titre</th>{type !== 'projects' && <th style={{padding:'10px', textAlign:'left', fontSize:'12px'}}>Projet</th>}{type !== 'projects' && <th style={{padding:'10px', textAlign:'left', fontSize:'12px'}}>Assigné à</th>}<th style={{padding:'10px', textAlign:'left', fontSize:'12px'}}>{type === 'projects' ? 'Site' : 'Échéance'}</th></tr></thead><tbody>{items.map(item => (<tr key={item.id} onClick={() => type !== 'projects' && onEditTask(item)} style={{borderBottom:'1px solid #eee', cursor: type !== 'projects' ? 'pointer' : 'default'}}><td style={{padding:'10px', fontSize:'13px', fontWeight:'500'}}>{type === 'projects' ? item.name : item.title}</td>{type !== 'projects' && <td style={{padding:'10px', fontSize:'12px', color:'#666'}}>{item.p_name}</td>}{type !== 'projects' && <td style={{padding:'10px', fontSize:'12px', color:'#666'}}>{item.u_name || '-'}</td>}<td style={{padding:'10px', fontSize:'12px', color:'#888'}}>{type === 'projects' ? 'Site #' + item.site_id : (item.due_date ? new Date(item.due_date).toLocaleDateString() : '-')}</td></tr>))}</tbody></table>{items.length === 0 && <div style={{padding:'20px', textAlign:'center', color:'#888'}}>Aucun élément trouvé.</div>}</div></div>
     );
 }
 
-// ... (MembersView, ProjectView, TrashView restent identiques au code précédent, je les inclus pour la complétude) ...
 function MembersView({ user }) {
     const [email, setEmail] = useState(""); const [inviteLink, setInviteLink] = useState(""); const [members, setMembers] = useState([]);
     useEffect(() => { fetch(`${API_URL}/users`).then(r=>r.json()).then(setMembers).catch(console.error); }, []);
@@ -181,6 +245,7 @@ function MembersView({ user }) {
     const del = async (uid) => { if(!confirm("Supprimer ?")) return; await fetch(`${API_URL}/users/${uid}`, {method:'DELETE'}); fetch(`${API_URL}/users`).then(r=>r.json()).then(setMembers); };
     return ( <div style={{padding:'20px', maxWidth:'100%'}}><h2 style={{fontSize:'20px'}}>Équipe RH</h2><div style={{background:'white', padding:'20px', borderRadius:'10px', border:'1px solid #eee', marginBottom:'20px'}}><h3 style={{marginTop:0, fontSize:'16px'}}>Inviter</h3><form onSubmit={inv} style={{display:'flex', gap:'10px'}}><input type="email" value={email} onChange={e=>setEmail(e.target.value)} placeholder="Email..." style={{flex:1, padding:'10px', border:'1px solid #ccc', borderRadius:'6px'}} required /><button type="submit" style={{padding:'10px', background:'#3b82f6', color:'white', border:'none', borderRadius:'6px'}}>Envoyer</button></form>{inviteLink && <div style={{marginTop:'10px', background:'#eff6ff', padding:'10px', borderRadius:'6px', fontSize:'11px', wordBreak:'break-all'}}>{inviteLink}</div>}</div><div style={{background:'white', borderRadius:'10px', border:'1px solid #eee', overflowX:'auto'}}><table style={{width:'100%', borderCollapse:'collapse', minWidth:'500px'}}><thead><tr style={{textAlign:'left', borderBottom:'2px solid #eee', background:'#f9f9f9'}}><th style={{padding:'10px', fontSize:'12px'}}>Nom</th><th style={{padding:'10px', fontSize:'12px'}}>Email</th><th style={{padding:'10px', fontSize:'12px'}}>Rôle</th><th></th></tr></thead><tbody>{members.map(m=>(<tr key={m.id} style={{borderBottom:'1px solid #f9f9f9'}}><td style={{padding:'10px', fontSize:'13px'}}>{m.username}</td><td style={{padding:'10px', color:'#666', fontSize:'12px'}}>{m.email}</td><td style={{padding:'10px'}}><select value={m.role} onChange={e=>role(m.id, e.target.value)} disabled={m.id===user.id} style={{fontSize:'12px'}}><option value="member">Membre</option><option value="admin">Admin</option></select></td><td style={{padding:'10px'}}>{m.id!==user.id && <button onClick={()=>del(m.id)} style={{color:'red', border:'none', background:'none'}}>×</button>}</td></tr>))}</tbody></table></div></div> );
 }
+
 function ProjectView({ project, tasks, members, allUsers, viewMode, setViewMode, onAddTask, onEditTask, onUpdateTask, onInvite, onDeleteProject, user }) {
     const [newTask, setNewTask] = useState("");
     const dragStart = (e, id) => e.dataTransfer.setData("taskId", id);
@@ -189,6 +254,7 @@ function ProjectView({ project, tasks, members, allUsers, viewMode, setViewMode,
     const exportPDF = () => { const doc = new jsPDF(); doc.text(`Rapport Projet: ${project.name}`, 14, 20); doc.setFontSize(10); doc.text(`Généré le ${new Date().toLocaleDateString()}`, 14, 28); const tableData = tasks.map(t => [t.title, t.status, getName(t.assignee_id), t.due_date ? new Date(t.due_date).toLocaleDateString() : '-']); autoTable(doc, { head: [['Tâche', 'Statut', 'Assigné à', 'Échéance']], body: tableData, startY: 35 }); doc.save(`${project.name}_rapport.pdf`); };
     return ( <div style={{padding:'20px', height:'100%', display:'flex', flexDirection:'column', background:'white'}}><div className="project-header" style={{display:'flex', justifyContent:'space-between', alignItems:'center', marginBottom:'15px'}}><div style={{display:'flex', alignItems:'center', gap:'10px'}}><div style={{width:'32px', height:'32px', background:'#f06a6a', borderRadius:'6px', display:'flex', alignItems:'center', justifyContent:'center', color:'white', fontSize:'14px', fontWeight:'bold'}}>{project.name.charAt(0)}</div><h2 style={{margin:0, fontSize:'18px'}}>{project.name}</h2></div><div style={{display:'flex', gap:'5px'}}><button onClick={exportPDF} style={{background:'#fff', border:'1px solid #ccc', padding:'5px 10px', borderRadius:'6px', fontSize:'12px', cursor:'pointer', color:'#333'}}>📄 PDF</button>{user.role==='admin' && <button onClick={()=>onDeleteProject(project.id)} style={{background:'#fee2e2', color:'red', border:'none', padding:'5px 10px', borderRadius:'6px', fontSize:'12px'}}>Supprimer</button>}</div></div><div className="view-buttons" style={{display:'flex', gap:'5px', marginBottom:'15px', background:'#f1f5f9', padding:'3px', borderRadius:'6px'}}><button onClick={()=>setViewMode('board')} style={{padding:'8px 12px', border:'none', borderRadius:'4px', background:viewMode==='board'?'white':'transparent', fontWeight:viewMode==='board'?'bold':'normal', fontSize:'13px'}}>Kanban</button><button onClick={()=>setViewMode('list')} style={{padding:'8px 12px', border:'none', borderRadius:'4px', background:viewMode==='list'?'white':'transparent', fontWeight:viewMode==='list'?'bold':'normal', fontSize:'13px'}}>Liste</button><button onClick={()=>setViewMode('timeline')} style={{padding:'8px 12px', border:'none', borderRadius:'4px', background:viewMode==='timeline'?'white':'transparent', fontWeight:viewMode==='timeline'?'bold':'normal', fontSize:'13px'}}>Gantt</button></div>{viewMode==='board' && <div className="kanban-board">{['todo', 'doing', 'done'].map(s=>(<div key={s} className="kanban-col" onDragOver={e=>e.preventDefault()} onDrop={e=>drop(e,s)}><div style={{fontWeight:'bold', marginBottom:'10px', textTransform:'uppercase', color:'#666', fontSize:'12px'}}>{s}</div>{s==='todo' && user.role==='admin' && <form onSubmit={e=>{e.preventDefault(); onAddTask(newTask); setNewTask("");}}><input placeholder="+ Tâche" value={newTask} onChange={e=>setNewTask(e.target.value)} style={{width:'100%', padding:'10px', marginBottom:'10px', border:'1px solid white', borderRadius:'6px'}}/></form>}<div style={{display:'flex', flexDirection:'column', gap:'10px'}}>{tasks.filter(t=>t.status===s).map(t=>(<div key={t.id} draggable="true" onDragStart={e=>dragStart(e,t.id)} onClick={()=>onEditTask(t)} style={{background:'white', padding:'12px', borderRadius:'8px', boxShadow:'0 1px 2px rgba(0,0,0,0.05)', borderLeft:`3px solid ${t.priority==='high'?'red':'transparent'}`}}><div style={{fontWeight:'500', fontSize:'14px'}}>{t.title}</div><div style={{fontSize:'11px', color:'#888', marginTop:'5px'}}>{getName(t.assignee_id)} • {t.due_date?new Date(t.due_date).toLocaleDateString().slice(0,5):''}</div></div>))}</div></div>))}</div>}{viewMode==='list' && <div style={{background:'white', borderRadius:'8px', border:'1px solid #eee', overflow:'hidden', overflowX:'auto'}}><table style={{width:'100%', borderCollapse:'collapse', minWidth:'500px'}}><thead style={{background:'#f9f9f9'}}><tr><th style={{padding:'10px', textAlign:'left', fontSize:'12px'}}>Titre</th><th style={{padding:'10px', textAlign:'left', fontSize:'12px'}}>Statut</th><th style={{padding:'10px', textAlign:'left', fontSize:'12px'}}>Assigné</th></tr></thead><tbody>{tasks.map(t=>(<tr key={t.id} onClick={()=>onEditTask(t)} style={{borderBottom:'1px solid #eee'}}><td style={{padding:'10px', fontSize:'13px'}}>{t.title}</td><td style={{padding:'10px', fontSize:'12px'}}>{t.status}</td><td style={{padding:'10px', fontSize:'12px'}}>{getName(t.assignee_id)}</td></tr>))}</tbody></table></div>}{viewMode==='timeline' && <GanttView tasks={tasks} onEditTask={onEditTask} />}</div> );
 }
+
 function TrashView() {
     const [items, setItems] = useState([]); const [error, setError] = useState(null);
     const load = () => { fetch(`${API_URL}/trash`).then(r=>{if(!r.ok)throw new Error("Err");return r.json()}).then(d=>{if(Array.isArray(d))setItems(d);else setItems([])}).catch(e=>{console.error(e); setError("HS");}) };
@@ -212,19 +278,9 @@ export default function App() {
   const navToProject = (p) => { setSelectedProject(p); setActiveTab(`project-${p.id}`); setMobileMenuOpen(false); };
   const createTask = async (title) => { const res = await fetch(`${API_URL}/tasks`, { method:'POST', headers:{'Content-Type':'application/json'}, body:JSON.stringify({project_id: selectedProject.id, title})}); const t = await res.json(); setProjectData({...projectData, tasks: [...projectData.tasks, t]}); };
   const updateTask = async (uT) => { 
-      // Mise à jour locale pour fluidité
-      if (activeTab.startsWith('global')) {
-          // Si on est dans une vue globale, on recharge juste la liste au lieu de modifier l'état complexe
-          // C'est plus simple ici de recharger la vue
-      } else {
-          setProjectData(prev => ({ ...prev, tasks: prev.tasks.map(t => t.id === uT.id ? uT : t) })); 
-      }
+      if (activeTab.startsWith('global')) { /* Rechargement auto via GlobalListView */ } 
+      else { setProjectData(prev => ({ ...prev, tasks: prev.tasks.map(t => t.id === uT.id ? uT : t) })); }
       await fetch(`${API_URL}/tasks/${uT.id}`, { method: 'PUT', headers: {'Content-Type': 'application/json'}, body: JSON.stringify(uT) }); 
-      // Rechargement des données globales si nécessaire
-      if (activeTab.startsWith('global')) {
-          // On force le rafraichissement en changeant de tab puis revenant ? Non, mieux : on ferme la modale et la vue se mettra à jour au prochain render ou on peut re-fetcher dans GlobalListView via un trigger.
-          // Pour l'instant simple : le user fermera et rouvrira ou on accepte que la liste soit statique jusqu'au refresh.
-      }
   };
   const deleteTask = async (taskId) => { await fetch(`${API_URL}/recycle/tasks/${taskId}`, { method:'PUT' }); setProjectData(prev => ({ ...prev, tasks: prev.tasks.filter(t => t.id !== taskId) })); setEditingTask(null); };
   const deleteProject = async (projId) => { if(!confirm("Supprimer ?")) return; await fetch(`${API_URL}/recycle/projects/${projId}`, { method:'PUT' }); loadData(); setActiveTab('home'); setSelectedProject(null); };
