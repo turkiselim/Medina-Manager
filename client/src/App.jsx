@@ -8,6 +8,11 @@ const API_URL = 'https://medina-api.onrender.com'; // <--- URL RENDER
 const styles = `
   .app-container { display: flex; height: 100vh; width: 100vw; overflow: hidden; }
   .sidebar { width: 250px; flex-shrink: 0; overflow-y: auto; background: #1e1f21; color: white; z-index: 100; transition: transform 0.3s ease; }
+  
+  /* LOGO STYLES */
+  .logo-container { background: white; padding: 15px; text-align: center; border-bottom: 4px solid #b8860b; } /* Bordure dorée pour rappeler le logo */
+  .logo-img { max-width: 100%; height: auto; display: block; margin: 0 auto; }
+
   .mobile-header { display: none; }
   .menu-overlay { display: none; }
   .main-content { flex: 1; overflow: hidden; background: white; position: relative; }
@@ -15,18 +20,17 @@ const styles = `
   .kanban-col { min-width: 300px; width: 300px; background: #f7f8f9; border-radius: 10px; padding: 15px; border: 1px solid #e0e0e0; flex-shrink: 0; }
   .stat-card { background: white; padding: 20px; border-radius: 10px; flex: 1; text-align: center; border: 1px solid #ddd; box-shadow: 0 2px 5px rgba(0,0,0,0.02); transition: transform 0.2s, box-shadow 0.2s; cursor: pointer; }
   .stat-card:hover { transform: translateY(-2px); box-shadow: 0 5px 15px rgba(0,0,0,0.1); border-color: #b0b0b0; }
-  
-  /* Style des commentaires */
   .comment-bubble { padding: 10px; background: white; border-radius: 8px; margin-bottom: 10px; box-shadow: 0 1px 2px rgba(0,0,0,0.05); border: 1px solid #eee; }
   .comment-img { max-width: 100%; max-height: 200px; border-radius: 6px; margin-top: 5px; display: block; border: 1px solid #ddd; cursor: pointer; }
 
   @media (max-width: 768px) {
     .app-container { flex-direction: column; }
-    .mobile-header { display: flex !important; position: fixed; top: 0; left: 0; right: 0; height: 60px; z-index: 900; box-shadow: 0 2px 5px rgba(0,0,0,0.1); background: #1e1f21; color: white; align-items: center; justify-content: space-between; padding: 0 20px; }
+    .mobile-header { display: flex !important; position: fixed; top: 0; left: 0; right: 0; height: 70px; z-index: 900; box-shadow: 0 2px 5px rgba(0,0,0,0.1); background: white; color: #333; align-items: center; justify-content: space-between; padding: 0 15px; border-bottom: 3px solid #b8860b; }
+    .mobile-header .logo-img { max-height: 50px; } /* Logo plus petit sur mobile */
     .sidebar { position: fixed; top: 0; left: 0; bottom: 0; transform: translateX(-100%); box-shadow: 5px 0 15px rgba(0,0,0,0.3); }
     .sidebar.open { transform: translateX(0); }
     .menu-overlay { display: block; position: fixed; inset: 0; background: rgba(0,0,0,0.5); z-index: 90; }
-    .main-content { margin-top: 60px; width: 100% !important; }
+    .main-content { margin-top: 70px; width: 100% !important; }
     .kanban-col { min-width: 85vw; width: 85vw; }
     .dash-stats { flex-direction: column; }
     .task-modal { width: 100% !important; height: 100% !important; border-radius: 0 !important; }
@@ -57,155 +61,44 @@ function GanttView({ tasks, onEditTask }) {
     );
 }
 
-// --- MODALE TÂCHE (AVEC COMMENTAIRES MULTIMÉDIA) ---
 function TaskModal({ task, allUsers, currentUser, onClose, onUpdate, onDelete }) {
   const [formData, setFormData] = useState(task);
   const [subtasks, setSubtasks] = useState([]);
   const [comments, setComments] = useState([]);
-  const [newSub, setNewSub] = useState(""); 
-  
-  // États pour le commentaire
-  const [newCom, setNewCom] = useState("");
-  const [comFile, setComFile] = useState(null); // Fichier sélectionné pour le commentaire
-  const [isUploading, setIsUploading] = useState(false);
-
+  const [newSub, setNewSub] = useState(""); const [newCom, setNewCom] = useState(""); const [comFile, setComFile] = useState(null); const [isUploading, setIsUploading] = useState(false);
   useEffect(() => { fetch(`${API_URL}/tasks/${task.id}/subtasks`).then(r=>r.json()).then(setSubtasks); fetch(`${API_URL}/tasks/${task.id}/comments`).then(r=>r.json()).then(setComments); }, [task]);
-  
   const save = () => { onUpdate(formData); onClose(); };
   const addS = async (e) => { e.preventDefault(); if(!newSub) return; const res=await fetch(`${API_URL}/subtasks`, {method:'POST', headers:{'Content-Type':'application/json'}, body:JSON.stringify({task_id:task.id, title:newSub})}); setSubtasks([...subtasks, await res.json()]); setNewSub(""); };
   const upS = async (u) => { setSubtasks(subtasks.map(s=>s.id===u.id?u:s)); await fetch(`${API_URL}/subtasks/${u.id}`, {method:'PUT', headers:{'Content-Type':'application/json'}, body:JSON.stringify(u)}); };
   const delS = async (id) => { setSubtasks(subtasks.filter(s=>s.id!==id)); await fetch(`${API_URL}/subtasks/${id}`, {method:'DELETE'}); };
-  
   const upF = async (e) => { const f=e.target.files[0]; if(!f) return; const d=new FormData(); d.append('file',f); const res=await fetch(`${API_URL}/upload`, {method:'POST', body:d}); const j=await res.json(); setFormData({...formData, attachment_url:j.url}); };
-
-  // ENVOI COMMENTAIRE (TEXTE + FICHIER)
-  const sendC = async (e) => { 
-      e.preventDefault(); 
-      if(!newCom && !comFile) return; 
-      setIsUploading(true);
-
-      let attachmentUrl = null;
-      if (comFile) {
-          const d = new FormData(); 
-          d.append('file', comFile);
-          try {
-              const res = await fetch(`${API_URL}/upload`, { method: 'POST', body: d });
-              const j = await res.json();
-              attachmentUrl = j.url;
-          } catch(err) { alert("Erreur upload image"); }
-      }
-
-      const res = await fetch(`${API_URL}/comments`, {
-          method:'POST', 
-          headers:{'Content-Type':'application/json'}, 
-          body:JSON.stringify({
-              task_id: task.id, 
-              user_id: currentUser.id, 
-              content: newCom,
-              attachment_url: attachmentUrl
-          })
-      }); 
-      
-      setComments([await res.json(), ...comments]); 
-      setNewCom(""); 
-      setComFile(null);
-      setIsUploading(false);
-  };
+  const sendC = async (e) => { e.preventDefault(); if(!newCom && !comFile) return; setIsUploading(true); let aUrl = null; if (comFile) { const d = new FormData(); d.append('file', comFile); try { const res = await fetch(`${API_URL}/upload`, { method: 'POST', body: d }); const j = await res.json(); aUrl = j.url; } catch(err) { alert("Erreur upload"); } } const res = await fetch(`${API_URL}/comments`, { method:'POST', headers:{'Content-Type':'application/json'}, body:JSON.stringify({ task_id: task.id, user_id: currentUser.id, content: newCom, attachment_url: aUrl }) }); setComments([await res.json(), ...comments]); setNewCom(""); setComFile(null); setIsUploading(false); };
 
   return (
     <div style={{position:'fixed', inset:0, background:'rgba(0,0,0,0.6)', display:'flex', justifyContent:'center', alignItems:'center', zIndex:2000, backdropFilter:'blur(2px)'}}>
       <div className="task-modal" style={{background:'white', width:'900px', height:'90vh', borderRadius:'12px', display:'flex', flexDirection:'column', overflow:'hidden', boxShadow:'0 25px 50px -12px rgba(0,0,0,0.25)'}}>
-        
         <div style={{padding:'15px', borderBottom:'1px solid #e2e8f0', display:'flex', justifyContent:'space-between', alignItems:'center'}}>
              <input value={formData.title} onChange={e=>setFormData({...formData, title:e.target.value})} style={{fontSize:'18px', fontWeight:'bold', border:'none', width:'100%', outline:'none'}} />
              <div style={{display:'flex', gap:'10px'}}>{currentUser.role==='admin' && <button onClick={()=>{if(confirm("Corbeille ?")) onDelete(task.id)}} style={{background:'#fee2e2', color:'red', border:'none', padding:'5px', borderRadius:'4px'}}>🗑️</button>}<button onClick={onClose} style={{background:'none', border:'none', fontSize:'24px'}}>✕</button></div>
         </div>
-
         <div className="task-modal-body" style={{display:'flex', flex:1, overflow:'hidden'}}>
-            {/* GAUCHE : Description, Sous-tâches, Commentaires */}
             <div className="task-modal-left" style={{flex:2, padding:'20px', overflowY:'auto', borderRight:'1px solid #e2e8f0', background:'#fff'}}>
-                
-                {/* Description */}
-                <textarea value={formData.description||''} onChange={e=>setFormData({...formData, description:e.target.value})} rows="3" style={{width:'100%', padding:'10px', marginBottom:'20px', border:'1px solid #ddd', borderRadius:'6px'}} placeholder="Ajouter une description..." />
-                
-                {/* Sous-tâches */}
-                <div style={{marginBottom:'20px'}}>
-                    <label style={{fontWeight:'bold', fontSize:'12px', color:'#888', marginBottom:'5px', display:'block'}}>SOUS-TÂCHES</label>
-                    {subtasks.map(s=>(<div key={s.id} style={{display:'flex', alignItems:'center', gap:'10px', padding:'5px 0'}}><input type="checkbox" checked={s.is_completed} onChange={e=>upS({...s, is_completed:e.target.checked})}/><input value={s.title} onChange={e=>upS({...s, title:e.target.value})} style={{border:'none', background:'transparent', flex:1, textDecoration:s.is_completed?'line-through':'none', color:s.is_completed?'#ccc':'inherit'}}/><button onClick={()=>delS(s.id)} style={{border:'none', color:'#ef4444'}}>×</button></div>))}
-                    <form onSubmit={addS}><input placeholder="+ Étape" value={newSub} onChange={e=>setNewSub(e.target.value)} style={{width:'100%', padding:'5px', marginTop:'5px', border:'1px dashed #ccc', borderRadius:'4px'}} /></form>
-                </div>
-
-                {/* Commentaires (Zone Chat) */}
-                <div style={{borderTop:'1px solid #eee', paddingTop:'20px'}}>
-                    <label style={{fontWeight:'bold', fontSize:'12px', color:'#888', marginBottom:'10px', display:'block'}}>DISCUSSION</label>
-                    
-                    {/* Liste des messages */}
-                    <div style={{background:'#f9f9f9', padding:'15px', borderRadius:'8px', maxHeight:'300px', overflowY:'auto', marginBottom:'15px', display:'flex', flexDirection:'column-reverse'}}>
-                        {comments.length === 0 && <div style={{textAlign:'center', color:'#aaa', fontSize:'12px'}}>Aucun message.</div>}
-                        {comments.map(c=>(
-                            <div key={c.id} className="comment-bubble">
-                                <div style={{fontSize:'11px', fontWeight:'bold', color:'#3b82f6', display:'flex', justifyContent:'space-between'}}>
-                                    {c.username}
-                                    <span style={{color:'#ccc', fontWeight:'normal'}}>{new Date(c.created_at).toLocaleDateString()} {new Date(c.created_at).toLocaleTimeString().slice(0,5)}</span>
-                                </div>
-                                <div style={{fontSize:'13px', marginTop:'2px', whiteSpace:'pre-wrap'}}>{c.content}</div>
-                                {c.attachment_url && (
-                                    c.attachment_url.match(/\.(jpeg|jpg|gif|png)$/) != null ? 
-                                    <img src={c.attachment_url} className="comment-img" onClick={()=>window.open(c.attachment_url, '_blank')} /> :
-                                    <a href={c.attachment_url} target="_blank" style={{display:'block', marginTop:'5px', fontSize:'12px', color:'#3b82f6'}}>📎 Voir la pièce jointe</a>
-                                )}
-                            </div>
-                        ))}
-                    </div>
-
-                    {/* Zone de saisie + Upload */}
-                    <form onSubmit={sendC} style={{display:'flex', gap:'10px', alignItems:'center'}}>
-                        <div style={{flex:1, position:'relative'}}>
-                            <input 
-                                value={newCom} 
-                                onChange={e=>setNewCom(e.target.value)} 
-                                placeholder="Écrire un message..." 
-                                style={{width:'100%', padding:'10px', borderRadius:'20px', border:'1px solid #ccc', paddingRight:'40px'}} 
-                            />
-                            {/* Bouton Trombone dans l'input */}
-                            <label style={{position:'absolute', right:'10px', top:'50%', transform:'translateY(-50%)', cursor:'pointer', color:'#888'}}>
-                                📎
-                                <input type="file" onChange={e=>setComFile(e.target.files[0])} style={{display:'none'}} />
-                            </label>
-                        </div>
-                        <button type="submit" disabled={isUploading} style={{background: isUploading ? '#ccc' : '#3b82f6', color:'white', border:'none', padding:'10px 15px', borderRadius:'50%', cursor:'pointer', width:'40px', height:'40px', display:'flex', alignItems:'center', justifyContent:'center'}}>
-                            {isUploading ? '...' : '➤'}
-                        </button>
-                    </form>
-                    {comFile && <div style={{fontSize:'11px', color:'#10b981', marginTop:'5px', marginLeft:'10px'}}>Image sélectionnée : {comFile.name} (Prêt à envoyer)</div>}
-                </div>
+                <textarea value={formData.description||''} onChange={e=>setFormData({...formData, description:e.target.value})} rows="3" style={{width:'100%', padding:'10px', marginBottom:'20px', border:'1px solid #ddd', borderRadius:'6px'}} placeholder="Description..." />
+                <div style={{marginBottom:'20px'}}><label style={{fontWeight:'bold', fontSize:'12px', color:'#888', marginBottom:'5px', display:'block'}}>SOUS-TÂCHES</label>{subtasks.map(s=>(<div key={s.id} style={{display:'flex', alignItems:'center', gap:'10px', padding:'5px 0'}}><input type="checkbox" checked={s.is_completed} onChange={e=>upS({...s, is_completed:e.target.checked})}/><input value={s.title} onChange={e=>upS({...s, title:e.target.value})} style={{border:'none', background:'transparent', flex:1, textDecoration:s.is_completed?'line-through':'none', color:s.is_completed?'#ccc':'inherit'}}/><button onClick={()=>delS(s.id)} style={{border:'none', color:'#ef4444'}}>×</button></div>))}<form onSubmit={addS}><input placeholder="+ Étape" value={newSub} onChange={e=>setNewSub(e.target.value)} style={{width:'100%', padding:'5px', marginTop:'5px', border:'1px dashed #ccc', borderRadius:'4px'}} /></form></div>
+                <div style={{borderTop:'1px solid #eee', paddingTop:'20px'}}><label style={{fontWeight:'bold', fontSize:'12px', color:'#888', marginBottom:'10px', display:'block'}}>DISCUSSION</label><div style={{background:'#f9f9f9', padding:'15px', borderRadius:'8px', maxHeight:'300px', overflowY:'auto', marginBottom:'15px', display:'flex', flexDirection:'column-reverse'}}>{comments.length===0 && <div style={{textAlign:'center', color:'#aaa', fontSize:'12px'}}>Aucun message.</div>}{comments.map(c=>(<div key={c.id} className="comment-bubble"><div style={{fontSize:'11px', fontWeight:'bold', color:'#3b82f6', display:'flex', justifyContent:'space-between'}}>{c.username}<span style={{color:'#ccc', fontWeight:'normal'}}>{new Date(c.created_at).toLocaleDateString()} {new Date(c.created_at).toLocaleTimeString().slice(0,5)}</span></div><div style={{fontSize:'13px', marginTop:'2px', whiteSpace:'pre-wrap'}}>{c.content}</div>{c.attachment_url && (c.attachment_url.match(/\.(jpeg|jpg|gif|png)$/)!=null?<img src={c.attachment_url} className="comment-img" onClick={()=>window.open(c.attachment_url,'_blank')}/>:<a href={c.attachment_url} target="_blank" style={{display:'block', marginTop:'5px', fontSize:'12px', color:'#3b82f6'}}>📎 Voir la pièce jointe</a>)}</div>))}</div><form onSubmit={sendC} style={{display:'flex', gap:'10px', alignItems:'center'}}><div style={{flex:1, position:'relative'}}><input value={newCom} onChange={e=>setNewCom(e.target.value)} placeholder="Écrire un message..." style={{width:'100%', padding:'10px', borderRadius:'20px', border:'1px solid #ccc', paddingRight:'40px'}} /><label style={{position:'absolute', right:'10px', top:'50%', transform:'translateY(-50%)', cursor:'pointer', color:'#888'}}>📎<input type="file" onChange={e=>setComFile(e.target.files[0])} style={{display:'none'}} /></label></div><button type="submit" disabled={isUploading} style={{background:isUploading?'#ccc':'#3b82f6', color:'white', border:'none', padding:'10px 15px', borderRadius:'50%', cursor:'pointer', width:'40px', height:'40px', display:'flex', alignItems:'center', justifyContent:'center'}}>{isUploading?'...':'➤'}</button></form>{comFile && <div style={{fontSize:'11px', color:'#10b981', marginTop:'5px', marginLeft:'10px'}}>Image : {comFile.name}</div>}</div>
             </div>
-
-            {/* DROITE : Attributs */}
             <div style={{flex:1, padding:'20px', background:'#f9fafb', display:'flex', flexDirection:'column', gap:'15px', overflowY:'auto'}}>
                 <div><label style={{fontSize:'11px', fontWeight:'bold', color:'#888'}}>STATUT</label><select value={formData.status||'todo'} onChange={e=>setFormData({...formData, status:e.target.value})} style={{width:'100%', padding:'8px'}}><option value="todo">À Faire</option><option value="doing">En Cours</option><option value="done">Terminé</option></select></div>
                 <div><label style={{fontSize:'11px', fontWeight:'bold', color:'#888'}}>ASSIGNÉ À</label><select value={formData.assignee_id||''} onChange={e=>setFormData({...formData, assignee_id:e.target.value})} style={{width:'100%', padding:'8px'}}><option value="">--</option>{allUsers.map(u=>(<option key={u.id} value={u.id}>{u.username}</option>))}</select></div>
                 <div style={{display:'flex', gap:'10px'}}><div style={{flex:1}}><label style={{fontSize:'11px', fontWeight:'bold', color:'#888'}}>DÉBUT</label><input type="date" value={formData.start_date?formData.start_date.split('T')[0]:''} onChange={e=>setFormData({...formData, start_date:e.target.value})} style={{width:'100%', padding:'8px'}}/></div><div style={{flex:1}}><label style={{fontSize:'11px', fontWeight:'bold', color:'#888'}}>FIN</label><input type="date" value={formData.due_date?formData.due_date.split('T')[0]:''} onChange={e=>setFormData({...formData, due_date:e.target.value})} style={{width:'100%', padding:'8px'}}/></div></div>
-                
-                {/* Pièce jointe principale de la tâche (différent des commentaires) */}
-                <div>
-                    <label style={{fontSize:'11px', fontWeight:'bold', color:'#888'}}>DOCUMENT TÂCHE</label>
-                    <div style={{marginTop:'5px', display:'flex', alignItems:'center', gap:'5px'}}>
-                        <label style={{padding:'6px 10px', border:'1px solid #ccc', cursor:'pointer', background:'white', borderRadius:'4px', fontSize:'12px'}}>📎 Upload<input type="file" onChange={upF} style={{display:'none'}}/></label>
-                        {formData.attachment_url && <a href={formData.attachment_url} target="_blank" style={{color:'#3b82f6', fontSize:'12px'}}>Voir le fichier</a>}
-                    </div>
-                </div>
-
-                <div style={{marginTop:'auto', paddingBottom:'20px'}}><button onClick={save} style={{width:'100%', padding:'12px', background:'#3b82f6', color:'white', border:'none', borderRadius:'6px', fontWeight:'bold'}}>Enregistrer les modifications</button></div>
+                <div><label style={{fontSize:'11px', fontWeight:'bold', color:'#888'}}>DOCUMENT TÂCHE</label><div style={{marginTop:'5px', display:'flex', alignItems:'center', gap:'5px'}}><label style={{padding:'6px 10px', border:'1px solid #ccc', cursor:'pointer', background:'white', borderRadius:'4px', fontSize:'12px'}}>📎 Upload<input type="file" onChange={upF} style={{display:'none'}}/></label>{formData.attachment_url && <a href={formData.attachment_url} target="_blank" style={{color:'#3b82f6', fontSize:'12px'}}>Voir le fichier</a>}</div></div>
+                <div style={{marginTop:'auto', paddingBottom:'20px'}}><button onClick={save} style={{width:'100%', padding:'12px', background:'#3b82f6', color:'white', border:'none', borderRadius:'6px', fontWeight:'bold'}}>Enregistrer</button></div>
             </div>
         </div>
       </div>
     </div>
   );
 }
-
-// ... (Le reste du code Dashboard, MembersView, ProjectView, TrashView, App reste inchangé par rapport à la V15) ...
-// Je remets les composants inchangés pour que le copier-coller fonctionne direct.
 
 function Dashboard({ user, onNavigate }) {
     const [activity, setActivity] = useState([]); const [stats, setStats] = useState({ projects: 0, pending: 0, completed: 0 }); const [error, setError] = useState(null);
@@ -278,7 +171,7 @@ export default function App() {
   const navToProject = (p) => { setSelectedProject(p); setActiveTab(`project-${p.id}`); setMobileMenuOpen(false); };
   const createTask = async (title) => { const res = await fetch(`${API_URL}/tasks`, { method:'POST', headers:{'Content-Type':'application/json'}, body:JSON.stringify({project_id: selectedProject.id, title})}); const t = await res.json(); setProjectData({...projectData, tasks: [...projectData.tasks, t]}); };
   const updateTask = async (uT) => { 
-      if (activeTab.startsWith('global')) { /* Rechargement auto via GlobalListView */ } 
+      if (activeTab.startsWith('global')) { /* Rechargement auto */ } 
       else { setProjectData(prev => ({ ...prev, tasks: prev.tasks.map(t => t.id === uT.id ? uT : t) })); }
       await fetch(`${API_URL}/tasks/${uT.id}`, { method: 'PUT', headers: {'Content-Type': 'application/json'}, body: JSON.stringify(uT) }); 
   };
@@ -292,9 +185,19 @@ export default function App() {
   return (
     <div className="app-container">
         {editingTask && <TaskModal task={editingTask} allUsers={allUsers} currentUser={user} onClose={()=>setEditingTask(null)} onUpdate={updateTask} onDelete={deleteTask} />}
-        <div className="mobile-header"><span style={{fontWeight:'bold'}}>MedinaOS</span><button onClick={()=>setMobileMenuOpen(!mobileMenuOpen)} style={{background:'none', border:'none', color:'white', fontSize:'24px'}}>☰</button></div>
+        {/* HEADER MOBILE (LOGO AJOUTÉ) */}
+        <div className="mobile-header">
+            <img src="/logo.png" alt="Belisaire Logo" className="logo-img" style={{maxHeight:'50px'}} />
+            <button onClick={()=>setMobileMenuOpen(!mobileMenuOpen)} style={{background:'none', border:'none', color:'#333', fontSize:'24px'}}>☰</button>
+        </div>
         {mobileMenuOpen && <div className="menu-overlay" onClick={()=>setMobileMenuOpen(false)}></div>}
-        <div className={`sidebar ${mobileMenuOpen ? 'open' : ''}`}><div style={{padding:'20px', fontWeight:'bold', fontSize:'18px'}}>MedinaOS</div><div style={{padding:'10px 20px', cursor:'pointer', background: activeTab==='home'?'rgba(255,255,255,0.1)':'transparent'}} onClick={()=>{setActiveTab('home'); setSelectedProject(null); setMobileMenuOpen(false);}}>🏠 Accueil</div>{user.role === 'admin' && <><div style={{padding:'10px 20px', cursor:'pointer'}} onClick={()=>{setActiveTab('members'); setSelectedProject(null); setMobileMenuOpen(false);}}>👥 Membres</div><div style={{padding:'10px 20px', cursor:'pointer'}} onClick={()=>{setActiveTab('trash'); setSelectedProject(null); setMobileMenuOpen(false);}}>🗑️ Corbeille</div></>}
+        {/* SIDEBAR PC (LOGO AJOUTÉ) */}
+        <div className={`sidebar ${mobileMenuOpen ? 'open' : ''}`}>
+            <div className="logo-container">
+                <img src="/logo.png" alt="Belisaire" className="logo-img" />
+            </div>
+            <div style={{padding:'10px 20px', cursor:'pointer', background: activeTab==='home'?'rgba(255,255,255,0.1)':'transparent'}} onClick={()=>{setActiveTab('home'); setSelectedProject(null); setMobileMenuOpen(false);}}>🏠 Accueil</div>
+            {user.role === 'admin' && <><div style={{padding:'10px 20px', cursor:'pointer'}} onClick={()=>{setActiveTab('members'); setSelectedProject(null); setMobileMenuOpen(false);}}>👥 Membres</div><div style={{padding:'10px 20px', cursor:'pointer'}} onClick={()=>{setActiveTab('trash'); setSelectedProject(null); setMobileMenuOpen(false);}}>🗑️ Corbeille</div></>}
             {sites.map(site => (<div key={site.id}><div style={{padding:'10px 20px', display:'flex', justifyContent:'space-between', color:'#888', fontSize:'12px', textTransform:'uppercase', marginTop:'10px'}}><span>{site.name}</span>{user.role === 'admin' && <div style={{display:'flex', gap:'5px'}}><button onClick={()=>setCreatingProjectForSite(creatingProjectForSite===site.id ? null : site.id)} style={{background:'none', border:'none', color:'#ccc', cursor:'pointer'}}>+</button><button onClick={()=>deleteSite(site.id)} style={{background:'none', border:'none', color:'#ef4444', cursor:'pointer'}}>x</button></div>}</div>{creatingProjectForSite === site.id && <form onSubmit={(e)=>createProject(e, site.id)} style={{padding:'0 20px 10px'}}><input autoFocus placeholder="Nom..." value={newProjectName} onChange={e=>setNewProjectName(e.target.value)} style={{width:'100%', padding:'5px', background:'#333', border:'none', color:'white'}} /></form>}{projects.filter(p => p.site_id === site.id).map(p => (<div key={p.id} style={{padding:'8px 30px', cursor:'pointer', background: activeTab===`project-${p.id}`?'rgba(255,255,255,0.1)':'transparent'}} onClick={() => navToProject(p)}>{p.name}</div>))}</div>))}
             {user.role === 'admin' && <div style={{padding:'20px'}}><form onSubmit={createSite} style={{display:'flex'}}><input placeholder="+ Site" value={newSiteName} onChange={e=>setNewSiteName(e.target.value)} style={{width:'100%', padding:'5px', background:'#333', border:'none', color:'white'}} /><button style={{background:'#f06a6a', border:'none', color:'white'}}>></button></form></div>}
             <div style={{marginTop:'auto', padding:'20px'}}><button onClick={handleLogout} style={{width:'100%'}}>Déconnexion</button></div>
