@@ -1,7 +1,7 @@
 import { useState, useEffect } from 'react';
 
 // Récupération automatique de l'URL de l'API (Même logique que App.jsx)
-const API_URL = 'https://medina-api-xxxx.onrender.com'; // <--- ⚠️ METTEZ VOTRE URL RENDER ICI
+const API_URL = 'https://medina-api.onrender.com'; // <--- ⚠️ METTEZ VOTRE URL RENDER ICI
 
 export default function Login({ onLogin }) {
     const [isRegistering, setIsRegistering] = useState(false);
