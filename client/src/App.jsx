@@ -3,7 +3,7 @@ import Login from './Login'
 import jsPDF from 'jspdf'
 import autoTable from 'jspdf-autotable'
 
-const API_URL = 'https://medina-api-xxxx.onrender.com'; // <--- VÉRIFIEZ VOTRE URL !
+const API_URL = 'https://medina-api.onrender.com'; // <--- VÉRIFIEZ VOTRE URL !
 
 const styles = `
   .app-container { display: flex; height: 100vh; width: 100vw; overflow: hidden; }
