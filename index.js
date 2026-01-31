@@ -59,7 +59,26 @@ app.post('/auth/login', async (req, res) => {
     const token = jwt.sign({ id: u.rows[0].id, role: u.rows[0].role }, process.env.JWT_SECRET || 'secret');
     res.json({ token, user: { id: u.rows[0].id, username: u.rows[0].username, email: u.rows[0].email, role: u.rows[0].role } });
 });
-app.post('/auth/register', async (req, res) => { const h = await bcrypt.hash(req.body.password, 10); const u = await pool.query("INSERT INTO users (username, email, password_hash, role) VALUES ($1, $2, $3, 'member') RETURNING *", [req.body.username, req.body.email, h]); res.json(u.rows[0]); });
+app.post('/auth/register', async (req, res) => {
+    try {
+        const { username, email, password, token } = req.body;
+        
+        // 1. VÉRIFICATION DU JETON
+        if (!token) return res.status(403).json("Inscription publique interdite. Demandez une invitation.");
+        
+        const invite = await pool.query("SELECT * FROM invitations WHERE token = $1", [token]);
+        if (invite.rows.length === 0) return res.status(403).json("Invitation invalide ou expirée.");
+
+        // 2. CRÉATION DE L'UTILISATEUR
+        const hash = await bcrypt.hash(password, 10);
+        const u = await pool.query("INSERT INTO users (username, email, password_hash, role) VALUES ($1, $2, $3, 'member') RETURNING id, username, email, role", [username, email, hash]);
+        
+        // 3. BRÛLER L'INVITATION (Usage unique)
+        await pool.query("DELETE FROM invitations WHERE token = $1", [token]);
+
+        res.json(u.rows[0]);
+    } catch (err) { res.status(500).send(err.message); }
+});
 app.get('/users', async (req, res) => { const u = await pool.query("SELECT id, username, email, role FROM users ORDER BY id"); res.json(u.rows); });
 app.put('/users/:id/role', async (req, res) => { await pool.query("UPDATE users SET role = $1 WHERE id = $2", [req.body.role, req.params.id]); res.json({ok:true}); });
 app.delete('/users/:id', async (req, res) => { await pool.query("DELETE FROM users WHERE id = $1", [req.params.id]); res.json({ok:true}); });
