@@ -78,9 +78,9 @@ function ProjectView({ project, tasks, allUsers, viewMode, setViewMode, onAddTas
 }
 
 // ==========================================
-// SIDEBAR (AVEC GESTION DES ESPACES)
+// SIDEBAR (AVEC RENOMMAGE PROJETS)
 // ==========================================
-function Sidebar({ sites, projects, activeProject, setActiveProject, onLogout, onCreateProject, onCreateSite, onUpdateSite, onDeleteSite, user, setPage }) {
+function Sidebar({ sites, projects, activeProject, setActiveProject, onLogout, onCreateProject, onUpdateProject, onCreateSite, onUpdateSite, onDeleteSite, user, setPage }) {
     const [expandedSites, setExpandedSites] = useState({});
     const toggleSite = (id) => setExpandedSites(prev => ({...prev, [id]: !prev[id]}));
 
@@ -114,7 +114,11 @@ function Sidebar({ sites, projects, activeProject, setActiveProject, onLogout, o
                         {expandedSites[site.id] && (
                             <div style={{paddingLeft:'28px', marginTop:'2px'}}>
                                 {projects.filter(p=>p.site_id===site.id).map(p=>(
-                                    <div key={p.id} onClick={()=>{setActiveProject(p.id); setPage('project');}} style={{padding:'8px', color:activeProject===p.id?'#60a5fa':'#cbd5e1', fontSize:'13px', cursor:'pointer'}}>{p.name}</div>
+                                    <div key={p.id} style={{display:'flex', justifyContent:'space-between', alignItems:'center', paddingRight:'10px', marginBottom:'2px', cursor:'pointer', background:activeProject===p.id?'rgba(59, 130, 246, 0.1)':'transparent', borderRadius:'4px'}}>
+                                        <div onClick={()=>{setActiveProject(p.id); setPage('project');}} style={{padding:'8px', color:activeProject===p.id?'#60a5fa':'#cbd5e1', fontSize:'13px', flex:1}}>{p.name}</div>
+                                        {/* CRAYON RENOMMER PROJET */}
+                                        {user.role==='admin' && <span onClick={()=>{const n=prompt("Renommer le projet ?", p.name); if(n) onUpdateProject(p.id, n);}} style={{fontSize:'10px', color:'#64748b', cursor:'pointer', opacity:0.6}}>✏️</span>}
+                                    </div>
                                 ))}
                                 {user.role==='admin' && <div onClick={()=>{const n=prompt("Nouveau projet ?"); if(n) onCreateProject(site.id, n);}} style={{padding:'8px', color:'#64748b', fontSize:'12px', fontStyle:'italic', cursor:'pointer'}}>+ Nouveau projet</div>}
                             </div>
@@ -159,6 +163,7 @@ function App() {
             <div style={{position:isMobile?'fixed':'relative', zIndex:999, height:'100%', transform:(isMobile&&!isMenuOpen)?'translateX(-100%)':'translateX(0)', transition:'0.3s'}}>
                 <Sidebar sites={sites} projects={projects} activeProject={activeProject} user={user} setActiveProject={setActiveProject} setPage={(p)=>{setCurrentPage(p); if(p!=='project') setActiveProject(null); setIsMenuOpen(false);}} onLogout={()=>{setUser(null); localStorage.removeItem('user');}} 
                     onCreateProject={async (s,n)=>{await fetch(`${API_BASE}/projects`,{method:'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify({site_id:s,name:n,owner_id:user.id})}); fetchData();}}
+                    onUpdateProject={async (id,n)=>{await fetch(`${API_BASE}/projects/${id}`,{method:'PUT',headers:{'Content-Type':'application/json'},body:JSON.stringify({name:n})}); fetchData();}}
                     onCreateSite={async (n)=>{await fetch(`${API_BASE}/sites`,{method:'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify({name:n})}); fetchData();}}
                     onUpdateSite={async (id,n)=>{await fetch(`${API_BASE}/sites/${id}`,{method:'PUT',headers:{'Content-Type':'application/json'},body:JSON.stringify({name:n})}); fetchData();}}
                     onDeleteSite={async (id)=>{await fetch(`${API_BASE}/sites/${id}`,{method:'DELETE'}); fetchData();}}
