@@ -49,10 +49,9 @@ function MembersView({ users, currentUser, onAddUser, onDeleteUser }) {
 }
 
 // ==========================================
-// COMPOSANT 2 : DASHBOARD (ULTIMATE)
+// COMPOSANT 2 : DASHBOARD
 // ==========================================
 function Dashboard({ projects, tasks, user, onOpenProject, allUsers }) {
-    // --- MODE DIRECTEUR (ADMIN) ---
     if (user.role === 'admin') {
         const tasksUrgent = tasks.filter(t => t.priority === 'high' && t.status !== 'done' && !t.deleted_at);
         const totalTasks = tasks.filter(t => !t.deleted_at).length;
@@ -63,8 +62,6 @@ function Dashboard({ projects, tasks, user, onOpenProject, allUsers }) {
             <div style={{padding:'40px', background:'#f8fafc', minHeight:'100vh'}}>
                 <h1 style={{fontSize:'26px', color:'#1e293b'}}>🏰 Tour de Contrôle</h1>
                 <p style={{color:'#64748b', marginBottom:'30px'}}>Vue d'ensemble stratégique de l'hôtel.</p>
-
-                {/* KPI + BARRE DE PROGRESSION (Restaurée) */}
                 <div style={{display:'grid', gridTemplateColumns:'repeat(auto-fit, minmax(220px, 1fr))', gap:'20px', marginBottom:'30px'}}>
                     <div style={{background:'white', padding:'25px', borderRadius:'16px', borderLeft:'6px solid #2563eb', boxShadow:'0 4px 6px -1px rgba(0, 0, 0, 0.05)'}}><div style={{fontSize:'12px', color:'#64748b', fontWeight:'700'}}>PROJETS ACTIFS</div><div style={{fontSize:'32px', fontWeight:'800', color:'#1e293b'}}>{projects.length}</div></div>
                     <div style={{background:'white', padding:'25px', borderRadius:'16px', borderLeft:'6px solid #ef4444', boxShadow:'0 4px 6px -1px rgba(0, 0, 0, 0.05)'}}><div style={{fontSize:'12px', color:'#64748b', fontWeight:'700'}}>URGENCES</div><div style={{fontSize:'32px', fontWeight:'800', color:'#ef4444'}}>{tasksUrgent.length}</div></div>
@@ -74,29 +71,20 @@ function Dashboard({ projects, tasks, user, onOpenProject, allUsers }) {
                         <div style={{height:'6px', background:'#e2e8f0', borderRadius:'3px', marginTop:'10px'}}><div style={{width:`${globalProgress}%`, height:'100%', background:'#10b981', borderRadius:'3px'}}></div></div>
                     </div>
                 </div>
-
                 <div style={{display:'grid', gridTemplateColumns:'repeat(auto-fit, minmax(300px, 1fr))', gap:'30px'}}>
-                    {/* ALERTES URGENTES */}
                     <div>
                          <h3 style={{fontSize:'18px', fontWeight:'700', color:'#334155'}}>🔥 Alertes Prioritaires</h3>
                          <div style={{background:'white', borderRadius:'16px', border:'1px solid #f1f5f9', overflow:'hidden', marginTop:'15px'}}>
                             {tasksUrgent.length === 0 ? <div style={{padding:'20px', textAlign:'center', color:'#94a3b8'}}>Aucune urgence.</div> : tasksUrgent.map(t => <div key={t.id} onClick={()=>onOpenProject(t.project_id)} style={{padding:'15px', borderBottom:'1px solid #f1f5f9', cursor:'pointer', display:'flex', justifyContent:'space-between'}}><span>⚠️ {t.title}</span><span style={{fontSize:'12px', color:'#ef4444'}}>Projet #{t.project_id}</span></div>)}
                         </div>
                     </div>
-
-                    {/* VUE ÉQUIPE (Restaurée) */}
                     <div>
                         <h3 style={{fontSize:'18px', fontWeight:'700', color:'#334155'}}>👥 Charge de travail</h3>
                         <div style={{background:'white', borderRadius:'16px', border:'1px solid #f1f5f9', padding:'20px', marginTop:'15px'}}>
                             {allUsers.map(u => {
                                 const userTasks = tasks.filter(t => t.assignee_id === u.id && t.status !== 'done' && !t.deleted_at).length;
                                 const loadColor = userTasks > 5 ? '#ef4444' : (userTasks > 2 ? '#facc15' : '#10b981');
-                                return (
-                                    <div key={u.id} style={{marginBottom:'15px'}}>
-                                        <div style={{display:'flex', justifyContent:'space-between', fontSize:'14px', marginBottom:'5px', fontWeight:'600', color:'#334155'}}><span>{u.username}</span><span>{userTasks} tâches</span></div>
-                                        <div style={{height:'6px', background:'#f1f5f9', borderRadius:'3px'}}><div style={{width:`${Math.min(userTasks*15, 100)}%`, height:'100%', background:loadColor, borderRadius:'3px'}}></div></div>
-                                    </div>
-                                )
+                                return (<div key={u.id} style={{marginBottom:'15px'}}><div style={{display:'flex', justifyContent:'space-between', fontSize:'14px', marginBottom:'5px', fontWeight:'600', color:'#334155'}}><span>{u.username}</span><span>{userTasks} tâches</span></div><div style={{height:'6px', background:'#f1f5f9', borderRadius:'3px'}}><div style={{width:`${Math.min(userTasks*15, 100)}%`, height:'100%', background:loadColor, borderRadius:'3px'}}></div></div></div>)
                             })}
                         </div>
                     </div>
@@ -104,7 +92,6 @@ function Dashboard({ projects, tasks, user, onOpenProject, allUsers }) {
             </div>
         );
     }
-    // --- MODE UTILISATEUR STANDARD ---
     const myTasks = tasks.filter(t => t.assignee_id === user.id && !t.deleted_at && t.status !== 'done');
     const myDone = tasks.filter(t => t.assignee_id === user.id && t.status === 'done' && !t.deleted_at).length;
     const myTotal = myTasks.length + myDone;
@@ -113,34 +100,26 @@ function Dashboard({ projects, tasks, user, onOpenProject, allUsers }) {
     return (
         <div style={{padding:'40px', background:'#f8fafc', minHeight:'100vh'}}>
             <h1 style={{fontSize:'24px', color:'#1e293b'}}>Bonjour, {user.username} 👋</h1>
-            
             <div style={{display:'grid', gridTemplateColumns:'repeat(2, 1fr)', gap:'20px', marginTop:'20px'}}>
-                <div style={{background:'white', padding:'20px', borderRadius:'16px', boxShadow:'0 2px 5px rgba(0,0,0,0.05)'}}>
-                    <div style={{fontSize:'28px', fontWeight:'bold', color:'#3b82f6'}}>{myTasks.length}</div>
-                    <div style={{fontSize:'12px', color:'#64748b', fontWeight:'bold'}}>TÂCHES À FAIRE</div>
-                </div>
-                <div style={{background:'white', padding:'20px', borderRadius:'16px', boxShadow:'0 2px 5px rgba(0,0,0,0.05)'}}>
-                     <div style={{fontSize:'28px', fontWeight:'bold', color:'#10b981'}}>{myProgress}%</div>
-                     <div style={{fontSize:'12px', color:'#64748b', fontWeight:'bold', marginBottom:'5px'}}>EFFICACITÉ</div>
-                     <div style={{height:'6px', background:'#f1f5f9', borderRadius:'3px'}}><div style={{width:`${myProgress}%`, height:'100%', background:'#10b981', borderRadius:'3px'}}></div></div>
-                </div>
+                <div style={{background:'white', padding:'20px', borderRadius:'16px', boxShadow:'0 2px 5px rgba(0,0,0,0.05)'}}><div style={{fontSize:'28px', fontWeight:'bold', color:'#3b82f6'}}>{myTasks.length}</div><div style={{fontSize:'12px', color:'#64748b', fontWeight:'bold'}}>TÂCHES À FAIRE</div></div>
+                <div style={{background:'white', padding:'20px', borderRadius:'16px', boxShadow:'0 2px 5px rgba(0,0,0,0.05)'}}><div style={{fontSize:'28px', fontWeight:'bold', color:'#10b981'}}>{myProgress}%</div><div style={{fontSize:'12px', color:'#64748b', fontWeight:'bold', marginBottom:'5px'}}>EFFICACITÉ</div><div style={{height:'6px', background:'#f1f5f9', borderRadius:'3px'}}><div style={{width:`${myProgress}%`, height:'100%', background:'#10b981', borderRadius:'3px'}}></div></div></div>
             </div>
-
             <h3 style={{fontSize:'18px', fontWeight:'700', color:'#334155', marginTop:'30px'}}>🎯 Ma feuille de route</h3>
-            <div style={{background:'white', borderRadius:'16px', marginTop:'15px', boxShadow:'0 4px 6px -1px rgba(0,0,0,0.05)'}}>
-                {myTasks.length===0?<div style={{padding:'40px', textAlign:'center', color:'#94a3b8'}}>Rien à faire !</div>:myTasks.map(t=><div key={t.id} onClick={()=>onOpenProject(t.project_id)} style={{padding:'20px', borderBottom:'1px solid #f1f5f9', cursor:'pointer', display:'flex', justifyContent:'space-between'}}><span>{t.title}</span>{t.priority==='high'&&<span style={{fontSize:'10px',background:'#fee2e2',color:'#ef4444',padding:'2px 6px',borderRadius:'4px'}}>URGENT</span>}</div>)}
-            </div>
+            <div style={{background:'white', borderRadius:'16px', marginTop:'15px', boxShadow:'0 4px 6px -1px rgba(0,0,0,0.05)'}}>{myTasks.length===0?<div style={{padding:'40px', textAlign:'center', color:'#94a3b8'}}>Rien à faire !</div>:myTasks.map(t=><div key={t.id} onClick={()=>onOpenProject(t.project_id)} style={{padding:'20px', borderBottom:'1px solid #f1f5f9', cursor:'pointer', display:'flex', justifyContent:'space-between'}}><span>{t.title}</span>{t.priority==='high'&&<span style={{fontSize:'10px',background:'#fee2e2',color:'#ef4444',padding:'2px 6px',borderRadius:'4px'}}>URGENT</span>}</div>)}</div>
         </div>
     );
 }
 
 // ==========================================
-// COMPOSANT 3 : VUE PROJET (ULTIMATE LIST)
+// COMPOSANT 3 : VUE PROJET (CORRECTION NOM)
 // ==========================================
 function ProjectView({ project, tasks, allUsers, viewMode, setViewMode, onAddTask, onEditTask, onUpdateTask, onDeleteProject, user }) {
     const [newTask, setNewTask] = useState("");
     const getSortedTasks = (taskList) => [...taskList].sort((a, b) => (( {high:3,normal:2,low:1}[b.priority]||2) - ({high:3,normal:2,low:1}[a.priority]||2)));
-    const getName = (id) => { const u = allUsers.find(x => x.id === id); return u ? u.username : '-'; };
+    
+    // CORRECTION : Affichage "Non assigné" si personne
+    const getName = (id) => { const u = allUsers.find(x => x.id === id); return u ? u.username : 'Non assigné'; };
+    
     const exportPDF = () => { const doc = new jsPDF(); doc.text(`Rapport: ${project.name}`, 14, 20); autoTable(doc, { head:[['Tâche','Statut','Qui', 'Date']], body:tasks.map(t=>[t.title,t.status,getName(t.assignee_id), t.due_date ? new Date(t.due_date).toLocaleDateString() : '-']), startY:30 }); doc.save('rapport.pdf'); };
 
     return ( 
@@ -154,7 +133,6 @@ function ProjectView({ project, tasks, allUsers, viewMode, setViewMode, onAddTas
                 <button onClick={()=>setViewMode('list')} style={{padding:'8px 15px', borderRadius:'6px', border:'none', background:viewMode==='list'?'#e2e8f0':'transparent', fontWeight:viewMode==='list'?'bold':'normal', cursor:'pointer'}}>Liste</button>
             </div>
             
-            {/* VUE KANBAN */}
             {viewMode==='board' && <div style={{display:'flex', gap:'20px', overflowX:'auto', paddingBottom:'10px', height:'100%'}}>{['todo', 'doing', 'done'].map(s=>(
                 <div key={s} onDragOver={e=>e.preventDefault()} onDrop={e=>{const id=e.dataTransfer.getData("id"); const t=tasks.find(x=>x.id==id); if(t) onUpdateTask({...t, status:s});}} style={{flex:'0 0 300px', background:'#f8fafc', padding:'15px', borderRadius:'12px', border:'1px solid #eee', height:'fit-content', maxHeight:'100%', overflowY:'auto'}}>
                     <div style={{fontWeight:'bold', marginBottom:'15px', textTransform:'uppercase', fontSize:'12px', color:'#64748b', letterSpacing:'1px'}}>{s}</div>
@@ -162,8 +140,7 @@ function ProjectView({ project, tasks, allUsers, viewMode, setViewMode, onAddTas
                     {getSortedTasks(tasks.filter(t=>(t.status||'todo')===s)).map(t=><div key={t.id} draggable onDragStart={e=>e.dataTransfer.setData("id",t.id)} onClick={()=>onEditTask(t)} style={{background:'white', padding:'15px', marginBottom:'10px', borderRadius:'8px', border:'1px solid #e2e8f0', borderLeft:t.priority==='high'?'4px solid #ef4444':'1px solid #e2e8f0', cursor:'pointer', boxShadow:'0 2px 4px rgba(0,0,0,0.02)'}}><div style={{fontWeight:'600', color:'#334155'}}>{t.title}</div><div style={{fontSize:'11px', color:'#94a3b8', marginTop:'8px', display:'flex', justifyContent:'space-between'}}><span>👤 {getName(t.assignee_id)}</span>{t.due_date && <span>📅 {new Date(t.due_date).toLocaleDateString().slice(0,5)}</span>}</div></div>)}
                 </div>
             ))}</div>}
-
-            {/* VUE LISTE DÉTAILLÉE (Restaurée) */}
+            
             {viewMode==='list' && <div style={{overflowX:'auto'}}><table style={{width:'100%', borderCollapse:'collapse', fontSize:'14px'}}>
                 <thead style={{background:'#f8fafc', borderBottom:'2px solid #e2e8f0'}}><tr><th style={{padding:'15px', textAlign:'left', color:'#64748b'}}>Tâche</th><th style={{padding:'15px', textAlign:'left', color:'#64748b'}}>Statut</th><th style={{padding:'15px', textAlign:'left', color:'#64748b'}}>Qui</th><th style={{padding:'15px', textAlign:'left', color:'#64748b'}}>Date</th></tr></thead>
                 <tbody>{tasks.map(t=><tr key={t.id} onClick={()=>onEditTask(t)} style={{borderBottom:'1px solid #f1f5f9', cursor:'pointer', ':hover':{background:'#f8fafc'}}}><td style={{padding:'15px', fontWeight:'500', color:'#334155'}}>{t.title}{t.priority==='high'&&<span style={{marginLeft:'10px', fontSize:'10px', background:'#fee2e2', color:'#ef4444', padding:'2px 6px', borderRadius:'4px'}}>URGENT</span>}</td><td style={{padding:'15px'}}><span style={{background:t.status==='done'?'#dcfce7':(t.status==='doing'?'#dbeafe':'#f1f5f9'), color:t.status==='done'?'#166534':(t.status==='doing'?'#1e40af':'#475569'), padding:'4px 10px', borderRadius:'20px', fontSize:'12px', fontWeight:'600', textTransform:'uppercase'}}>{t.status}</span></td><td style={{padding:'15px', color:'#64748b'}}>{getName(t.assignee_id)}</td><td style={{padding:'15px', color:'#64748b', fontSize:'13px'}}>{t.due_date ? new Date(t.due_date).toLocaleDateString() : '-'}</td></tr>)}</tbody>
@@ -173,7 +150,7 @@ function ProjectView({ project, tasks, allUsers, viewMode, setViewMode, onAddTas
 }
 
 // ==========================================
-// SIDEBAR (AVEC LOGO)
+// SIDEBAR
 // ==========================================
 function Sidebar({ sites, projects, activeProject, setActiveProject, onLogout, onCreateProject, onUpdateProject, onCreateSite, onUpdateSite, onDeleteSite, user, setPage, closeMobileMenu }) {
     const [expandedSites, setExpandedSites] = useState({});
@@ -182,40 +159,20 @@ function Sidebar({ sites, projects, activeProject, setActiveProject, onLogout, o
 
     return (
         <div style={{width:'260px', background:'#1e293b', color:'white', display:'flex', flexDirection:'column', height:'100%', borderRight:'1px solid #334155'}}>
-            {/* ZONE LOGO */}
             <div style={{padding:'20px', borderBottom:'1px solid #334155', display:'flex', alignItems:'center', gap:'10px'}}>
-                {/* REMPLACEZ LA SRC PAR VOTRE LOGO (ex: "/logo.png") */}
                 <img src="/logo.png" alt="Medina Logo" style={{height:'40px', width:'auto', objectFit:'contain'}} onError={(e)=>{e.target.onerror=null; e.target.style.display='none'; e.target.parentNode.innerHTML='<span style="font-size:18px; font-weight:800;">Medina<span style="color:#3b82f6">.</span></span>';}} />
             </div>
-
             <div style={{padding:'20px 10px', flex:1, overflowY:'auto'}}>
                 <div onClick={()=>handleNav('dashboard')} style={{padding:'10px', cursor:'pointer', color:'#94a3b8', fontWeight:'bold', display:'flex', alignItems:'center', gap:'10px'}}>🏠 Tableau de Bord</div>
                 <div onClick={()=>handleNav('members')} style={{padding:'10px', cursor:'pointer', color:'#94a3b8', fontWeight:'bold', display:'flex', alignItems:'center', gap:'10px'}}>👥 Équipe</div>
-                
-                <div style={{margin:'25px 10px 10px 10px', display:'flex', justifyContent:'space-between', alignItems:'center'}}>
-                    <span style={{fontSize:'11px', color:'#64748b', fontWeight:'bold', textTransform:'uppercase'}}>ESPACES DE TRAVAIL</span>
-                    {user.role==='admin' && <span onClick={()=>{const n=prompt("Nouvel Espace ?"); if(n) onCreateSite(n);}} style={{cursor:'pointer', color:'#3b82f6', fontSize:'16px', fontWeight:'bold'}}>+</span>}
-                </div>
-
+                <div style={{margin:'25px 10px 10px 10px', display:'flex', justifyContent:'space-between', alignItems:'center'}}><span style={{fontSize:'11px', color:'#64748b', fontWeight:'bold', textTransform:'uppercase'}}>ESPACES DE TRAVAIL</span>{user.role==='admin' && <span onClick={()=>{const n=prompt("Nouvel Espace ?"); if(n) onCreateSite(n);}} style={{cursor:'pointer', color:'#3b82f6', fontSize:'16px', fontWeight:'bold'}}>+</span>}</div>
                 {sites.map(site => (
                     <div key={site.id} style={{marginBottom:'5px'}}>
                         <div style={{padding:'10px', borderRadius:'8px', display:'flex', justifyContent:'space-between', alignItems:'center', cursor:'pointer', background:'#1e293b', transition:'0.2s', ':hover':{background:'#334155'}}} onMouseEnter={e=>e.currentTarget.style.background='#334155'} onMouseLeave={e=>e.currentTarget.style.background='transparent'}>
-                            <div onClick={()=>toggleSite(site.id)} style={{display:'flex', alignItems:'center', gap:'10px', flex:1}}>
-                                <span style={{fontSize:'10px', color:'#64748b'}}>{expandedSites[site.id]?'▼':'▶'}</span><span style={{fontWeight:'600', fontSize:'14px'}}>{site.name}</span>
-                            </div>
+                            <div onClick={()=>toggleSite(site.id)} style={{display:'flex', alignItems:'center', gap:'10px', flex:1}}><span style={{fontSize:'10px', color:'#64748b'}}>{expandedSites[site.id]?'▼':'▶'}</span><span style={{fontWeight:'600', fontSize:'14px'}}>{site.name}</span></div>
                             {user.role==='admin' && <div style={{display:'flex', gap:'8px'}}><span onClick={()=>{const n=prompt("Renommer ?", site.name); if(n) onUpdateSite(site.id, n);}} style={{cursor:'pointer', fontSize:'12px', opacity:0.5}}>✏️</span><span onClick={()=>{if(confirm("Supprimer tout l'espace ?")) onDeleteSite(site.id);}} style={{cursor:'pointer', fontSize:'12px', opacity:0.5}}>🗑️</span></div>}
                         </div>
-                        {expandedSites[site.id] && (
-                            <div style={{paddingLeft:'28px', marginTop:'2px'}}>
-                                {projects.filter(p=>p.site_id===site.id).map(p=>(
-                                    <div key={p.id} style={{display:'flex', justifyContent:'space-between', alignItems:'center', paddingRight:'10px', marginBottom:'2px', cursor:'pointer', background:activeProject===p.id?'rgba(59, 130, 246, 0.1)':'transparent', borderRadius:'4px'}}>
-                                        <div onClick={()=>handleNav('project', p.id)} style={{padding:'8px', color:activeProject===p.id?'#60a5fa':'#cbd5e1', fontSize:'13px', flex:1}}>📁 {p.name}</div>
-                                        {user.role==='admin' && <span onClick={()=>{const n=prompt("Renommer projet ?", p.name); if(n) onUpdateProject(p.id, n);}} style={{fontSize:'10px', color:'#64748b', cursor:'pointer', opacity:0.5}}>✏️</span>}
-                                    </div>
-                                ))}
-                                {user.role==='admin' && <div onClick={()=>{const n=prompt("Nouveau projet ?"); if(n) onCreateProject(site.id, n);}} style={{padding:'8px', color:'#64748b', fontSize:'12px', fontStyle:'italic', cursor:'pointer', marginTop:'5px'}}>+ Nouveau projet</div>}
-                            </div>
-                        )}
+                        {expandedSites[site.id] && (<div style={{paddingLeft:'28px', marginTop:'2px'}}>{projects.filter(p=>p.site_id===site.id).map(p=>(<div key={p.id} style={{display:'flex', justifyContent:'space-between', alignItems:'center', paddingRight:'10px', marginBottom:'2px', cursor:'pointer', background:activeProject===p.id?'rgba(59, 130, 246, 0.1)':'transparent', borderRadius:'4px'}}><div onClick={()=>handleNav('project', p.id)} style={{padding:'8px', color:activeProject===p.id?'#60a5fa':'#cbd5e1', fontSize:'13px', flex:1}}>📁 {p.name}</div>{user.role==='admin' && <span onClick={()=>{const n=prompt("Renommer projet ?", p.name); if(n) onUpdateProject(p.id, n);}} style={{fontSize:'10px', color:'#64748b', cursor:'pointer', opacity:0.5}}>✏️</span>}</div>))}{user.role==='admin' && <div onClick={()=>{const n=prompt("Nouveau projet ?"); if(n) onCreateProject(site.id, n);}} style={{padding:'8px', color:'#64748b', fontSize:'12px', fontStyle:'italic', cursor:'pointer', marginTop:'5px'}}>+ Nouveau projet</div>}</div>)}
                     </div>
                 ))}
             </div>
@@ -228,7 +185,7 @@ function Sidebar({ sites, projects, activeProject, setActiveProject, onLogout, o
 }
 
 // ==========================================
-// APP
+// APP (LOGIQUE CORRIGÉE)
 // ==========================================
 function App() {
     const [user, setUser] = useState(JSON.parse(localStorage.getItem('user')) || null);
@@ -266,7 +223,21 @@ function App() {
                 {currentPage==='members' && <MembersView users={allUsers} currentUser={user} onAddUser={async(u)=>{await fetch(`${API_BASE}/users`,{method:'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify(u)}); fetchData();}} onDeleteUser={async(id)=>{await fetch(`${API_BASE}/users/${id}`,{method:'DELETE'}); fetchData();}} />}
                 {currentPage==='dashboard' && <Dashboard projects={projects} tasks={tasks} user={user} allUsers={allUsers} onOpenProject={(id)=>{setActiveProject(id); setCurrentPage('project');}} />}
                 {currentPage==='project' && activeProject && <ProjectView project={activeProjectData} tasks={activeProjectTasks} allUsers={allUsers} user={user} viewMode={viewMode} setViewMode={setViewMode} 
-                    onAddTask={async(t)=>{await fetch(`${API_BASE}/tasks`,{method:'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify({project_id:activeProject,title:t,status:'todo',priority:'normal',assignee_id:user.id})}); fetchData();}} 
+                    // 🔥 CORRECTION : SI ADMIN, ASSIGNEE_ID EST NULL (PAS D'AUTO-ASSIGNATION)
+                    onAddTask={async(t)=>{
+                        await fetch(`${API_BASE}/tasks`,{
+                            method:'POST',
+                            headers:{'Content-Type':'application/json'},
+                            body:JSON.stringify({
+                                project_id:activeProject,
+                                title:t,
+                                status:'todo',
+                                priority:'normal',
+                                assignee_id: user.role === 'admin' ? null : user.id // <--- C'EST ICI QUE CA SE JOUE !
+                            })
+                        }); 
+                        fetchData();
+                    }} 
                     onEditTask={setEditingTask} 
                     onUpdateTask={async(t)=>{await fetch(`${API_BASE}/tasks/${t.id}`,{method:'PUT',headers:{'Content-Type':'application/json'},body:JSON.stringify(t)}); fetchData();}} 
                     onDeleteProject={async(id)=>{if(confirm("Supprimer?")) await fetch(`${API_BASE}/projects/${id}`,{method:'DELETE'}); setActiveProject(null); setCurrentPage('dashboard'); fetchData();}} />}
