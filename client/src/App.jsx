@@ -5,7 +5,7 @@ import autoTable from 'jspdf-autotable';
 const API_BASE = "https://medina-api.onrender.com"; 
 
 // ==========================================
-// COMPOSANT 1 : GESTION ÉQUIPE
+// 1. GESTION ÉQUIPE
 // ==========================================
 function MembersView({ users, currentUser, onAddUser, onDeleteUser }) {
     const [isAdding, setIsAdding] = useState(false);
@@ -21,28 +21,19 @@ function MembersView({ users, currentUser, onAddUser, onDeleteUser }) {
 }
 
 // ==========================================
-// COMPOSANT 2 : DASHBOARD (Avec Scroll Widget)
+// 2. DASHBOARD
 // ==========================================
 function Dashboard({ projects, tasks, user, onOpenProject, allUsers }) {
-    const scrollToTasks = () => {
-        const el = document.getElementById('task-list-section');
-        if(el) el.scrollIntoView({ behavior: 'smooth' });
-    };
-
+    const scrollToTasks = () => { const el = document.getElementById('task-list-section'); if(el) el.scrollIntoView({ behavior: 'smooth' }); };
     if (user.role === 'admin') {
         const tasksUrgent = tasks.filter(t => t.priority === 'high' && t.status !== 'done' && !t.deleted_at);
         const totalTasks = tasks.filter(t => !t.deleted_at).length;
         const tasksDone = tasks.filter(t => t.status === 'done' && !t.deleted_at).length;
         const globalProgress = totalTasks === 0 ? 0 : Math.round((tasksDone / totalTasks) * 100);
-
         return (
             <div style={{padding:'40px', background:'#f8fafc', minHeight:'100vh'}}>
                 <h1 style={{fontSize:'26px', color:'#1e293b'}}>🏰 Tour de Contrôle</h1><p style={{color:'#64748b', marginBottom:'30px'}}>Vue d'ensemble.</p>
-                <div style={{display:'grid', gridTemplateColumns:'repeat(auto-fit, minmax(220px, 1fr))', gap:'20px', marginBottom:'30px'}}>
-                    <div style={{background:'white', padding:'25px', borderRadius:'16px', borderLeft:'6px solid #2563eb', boxShadow:'0 4px 6px -1px rgba(0, 0, 0, 0.05)'}}><div style={{fontSize:'12px', color:'#64748b', fontWeight:'700'}}>PROJETS ACTIFS</div><div style={{fontSize:'32px', fontWeight:'800', color:'#1e293b'}}>{projects.length}</div></div>
-                    <div style={{background:'white', padding:'25px', borderRadius:'16px', borderLeft:'6px solid #ef4444', boxShadow:'0 4px 6px -1px rgba(0, 0, 0, 0.05)'}}><div style={{fontSize:'12px', color:'#64748b', fontWeight:'700'}}>URGENCES</div><div style={{fontSize:'32px', fontWeight:'800', color:'#ef4444'}}>{tasksUrgent.length}</div></div>
-                    <div style={{background:'white', padding:'25px', borderRadius:'16px', borderLeft:'6px solid #10b981', boxShadow:'0 4px 6px -1px rgba(0, 0, 0, 0.05)'}}><div style={{fontSize:'12px', color:'#64748b', fontWeight:'700'}}>AVANCEMENT</div><div style={{fontSize:'32px', fontWeight:'800', color:'#10b981'}}>{globalProgress}%</div><div style={{height:'6px', background:'#e2e8f0', borderRadius:'3px', marginTop:'10px'}}><div style={{width:`${globalProgress}%`, height:'100%', background:'#10b981', borderRadius:'3px'}}></div></div></div>
-                </div>
+                <div style={{display:'grid', gridTemplateColumns:'repeat(auto-fit, minmax(220px, 1fr))', gap:'20px', marginBottom:'30px'}}><div style={{background:'white', padding:'25px', borderRadius:'16px', borderLeft:'6px solid #2563eb', boxShadow:'0 4px 6px -1px rgba(0, 0, 0, 0.05)'}}><div style={{fontSize:'12px', color:'#64748b', fontWeight:'700'}}>PROJETS ACTIFS</div><div style={{fontSize:'32px', fontWeight:'800', color:'#1e293b'}}>{projects.length}</div></div><div style={{background:'white', padding:'25px', borderRadius:'16px', borderLeft:'6px solid #ef4444', boxShadow:'0 4px 6px -1px rgba(0, 0, 0, 0.05)'}}><div style={{fontSize:'12px', color:'#64748b', fontWeight:'700'}}>URGENCES</div><div style={{fontSize:'32px', fontWeight:'800', color:'#ef4444'}}>{tasksUrgent.length}</div></div><div style={{background:'white', padding:'25px', borderRadius:'16px', borderLeft:'6px solid #10b981', boxShadow:'0 4px 6px -1px rgba(0, 0, 0, 0.05)'}}><div style={{fontSize:'12px', color:'#64748b', fontWeight:'700'}}>AVANCEMENT</div><div style={{fontSize:'32px', fontWeight:'800', color:'#10b981'}}>{globalProgress}%</div><div style={{height:'6px', background:'#e2e8f0', borderRadius:'3px', marginTop:'10px'}}><div style={{width:`${globalProgress}%`, height:'100%', background:'#10b981', borderRadius:'3px'}}></div></div></div></div>
                 <div style={{display:'grid', gridTemplateColumns:'repeat(auto-fit, minmax(300px, 1fr))', gap:'30px'}}><div><h3 style={{fontSize:'18px', fontWeight:'700', color:'#334155'}}>🔥 Alertes</h3><div style={{background:'white', borderRadius:'16px', border:'1px solid #f1f5f9', overflow:'hidden', marginTop:'15px'}}>{tasksUrgent.length === 0 ? <div style={{padding:'20px', textAlign:'center', color:'#94a3b8'}}>Aucune urgence.</div> : tasksUrgent.map(t => <div key={t.id} onClick={()=>onOpenProject(t.project_id)} style={{padding:'15px', borderBottom:'1px solid #f1f5f9', cursor:'pointer', display:'flex', justifyContent:'space-between'}}><span>⚠️ {t.title}</span><span style={{fontSize:'12px', color:'#ef4444'}}>Projet #{t.project_id}</span></div>)}</div></div><div><h3 style={{fontSize:'18px', fontWeight:'700', color:'#334155'}}>👥 Charge</h3><div style={{background:'white', borderRadius:'16px', border:'1px solid #f1f5f9', padding:'20px', marginTop:'15px'}}>{allUsers.map(u => {const userTasks = tasks.filter(t => t.assignee_id === u.id && t.status !== 'done' && !t.deleted_at).length; const loadColor = userTasks > 5 ? '#ef4444' : (userTasks > 2 ? '#facc15' : '#10b981'); return (<div key={u.id} style={{marginBottom:'15px'}}><div style={{display:'flex', justifyContent:'space-between', fontSize:'14px', marginBottom:'5px', fontWeight:'600', color:'#334155'}}><span>{u.username}</span><span>{userTasks} tâches</span></div><div style={{height:'6px', background:'#f1f5f9', borderRadius:'3px'}}><div style={{width:`${Math.min(userTasks*15, 100)}%`, height:'100%', background:loadColor, borderRadius:'3px'}}></div></div></div>)})}</div></div></div>
             </div>
         );
@@ -53,7 +44,7 @@ function Dashboard({ projects, tasks, user, onOpenProject, allUsers }) {
         <div style={{padding:'40px', background:'#f8fafc', minHeight:'100vh'}}>
             <h1 style={{fontSize:'24px', color:'#1e293b'}}>Bonjour, {user.username} 👋</h1>
             <div style={{display:'grid', gridTemplateColumns:'repeat(2, 1fr)', gap:'20px', marginTop:'20px'}}>
-                <div onClick={scrollToTasks} style={{background:'white', padding:'20px', borderRadius:'16px', boxShadow:'0 2px 5px rgba(0,0,0,0.05)', cursor:'pointer', border:'1px solid #e2e8f0'}}><div style={{fontSize:'28px', fontWeight:'bold', color:'#3b82f6'}}>{myTasks.length}</div><div style={{fontSize:'12px', color:'#64748b', fontWeight:'bold'}}>À FAIRE (cliquer)</div></div>
+                <div onClick={scrollToTasks} style={{background:'white', padding:'20px', borderRadius:'16px', boxShadow:'0 2px 5px rgba(0,0,0,0.05)', cursor:'pointer', border:'1px solid #e2e8f0'}}><div style={{fontSize:'28px', fontWeight:'bold', color:'#3b82f6'}}>{myTasks.length}</div><div style={{fontSize:'12px', color:'#64748b', fontWeight:'bold'}}>À FAIRE</div></div>
                 <div style={{background:'white', padding:'20px', borderRadius:'16px', boxShadow:'0 2px 5px rgba(0,0,0,0.05)'}}><div style={{fontSize:'28px', fontWeight:'bold', color:'#10b981'}}>{myProgress}%</div><div style={{fontSize:'12px', color:'#64748b', fontWeight:'bold', marginBottom:'5px'}}>EFFICACITÉ</div><div style={{height:'6px', background:'#f1f5f9', borderRadius:'3px'}}><div style={{width:`${myProgress}%`, height:'100%', background:'#10b981', borderRadius:'3px'}}></div></div></div>
             </div>
             <h3 id="task-list-section" style={{fontSize:'18px', fontWeight:'700', color:'#334155', marginTop:'30px'}}>🎯 Mes Tâches</h3>
@@ -63,7 +54,7 @@ function Dashboard({ projects, tasks, user, onOpenProject, allUsers }) {
 }
 
 // ==========================================
-// COMPOSANT 3 : VUE PROJET
+// 3. VUE PROJET
 // ==========================================
 function ProjectView({ project, tasks, allUsers, viewMode, setViewMode, onAddTask, onEditTask, onUpdateTask, onDeleteProject, user }) {
     const [newTask, setNewTask] = useState("");
@@ -82,7 +73,7 @@ function ProjectView({ project, tasks, allUsers, viewMode, setViewMode, onAddTas
 }
 
 // ==========================================
-// 🔥 MODAL RESPONSIVE (CORRECTIF SMARTPHONE)
+// 🔥 MODAL DESIGNER V13 (Onglets sur Mobile)
 // ==========================================
 function EditTaskModal({ task, user, allUsers, onClose, onUpdate, onDelete }) {
     const [editedTask, setEditedTask] = useState(task);
@@ -90,8 +81,9 @@ function EditTaskModal({ task, user, allUsers, onClose, onUpdate, onDelete }) {
     const [newComment, setNewComment] = useState("");
     const [file, setFile] = useState(null);
     const [isUploading, setIsUploading] = useState(false);
+    const [activeTab, setActiveTab] = useState('details'); // 'details' ou 'chat' (Mobile uniquement)
     const fileInputRef = useRef(null);
-    const isMobile = window.innerWidth < 768; // Détection mobile
+    const isMobile = window.innerWidth < 768;
 
     useEffect(() => {
         fetch(`${API_BASE}/comments/${task.id}`, { headers: {'Authorization': user.token} })
@@ -112,80 +104,104 @@ function EditTaskModal({ task, user, allUsers, onClose, onUpdate, onDelete }) {
         try { await fetch(`${API_BASE}/comments`, { method: 'POST', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify(payload) }); const res = await fetch(`${API_BASE}/comments/${task.id}`); setComments(await res.json()); setNewComment(""); setFile(null); } catch(err) { alert("Erreur envoi"); } setIsUploading(false);
     };
 
+    // CONTENU DÉTAILS (Formulaire)
+    const DetailsContent = () => (
+        <div style={{padding: '25px', overflowY:'auto', height:'100%'}}>
+            <input value={editedTask.title} onChange={e=>setEditedTask({...editedTask, title:e.target.value})} style={{width:'100%', padding:'15px', border:'1px solid #cbd5e1', borderRadius:'10px', fontSize:'16px', marginBottom:'20px', fontWeight:'600', color:'#1e293b'}} />
+            <div style={{display: 'grid', gridTemplateColumns: '1fr 1fr', gap: '15px', marginBottom:'20px'}}>
+                <div><label style={{fontSize:'11px', fontWeight:'bold', color:'#64748b', textTransform:'uppercase'}}>Statut</label><select value={editedTask.status} onChange={e=>setEditedTask({...editedTask, status:e.target.value})} style={{width:'100%', padding:'12px', borderRadius:'8px', border:'1px solid #cbd5e1', background:'white', marginTop:'5px'}}><option value="todo">À faire</option><option value="doing">En cours</option><option value="done">Terminé</option></select></div>
+                <div><label style={{fontSize:'11px', fontWeight:'bold', color:'#64748b', textTransform:'uppercase'}}>Priorité</label><select value={editedTask.priority} onChange={e=>setEditedTask({...editedTask, priority:e.target.value})} style={{width:'100%', padding:'12px', borderRadius:'8px', border:'1px solid #cbd5e1', background:'white', marginTop:'5px'}}><option value="low">Basse</option><option value="normal">Normale</option><option value="high">Haute 🔥</option></select></div>
+            </div>
+            {user.role === 'admin' && <div style={{marginBottom:'20px'}}><label style={{fontSize:'11px', fontWeight:'bold', color:'#64748b', textTransform:'uppercase'}}>Responsable</label><select value={editedTask.assignee_id || ''} onChange={e=>setEditedTask({...editedTask, assignee_id:parseInt(e.target.value)})} style={{width:'100%', padding:'12px', borderRadius:'8px', border:'1px solid #cbd5e1', background:'white', marginTop:'5px'}}><option value="">-- Personne --</option>{allUsers.map(u => <option key={u.id} value={u.id}>{u.username}</option>)}</select></div>}
+            <div style={{marginBottom:'30px'}}><label style={{fontSize:'11px', fontWeight:'bold', color:'#64748b', textTransform:'uppercase'}}>Échéance</label><input type="date" value={editedTask.due_date ? editedTask.due_date.split('T')[0] : ''} onChange={e=>setEditedTask({...editedTask, due_date:e.target.value})} style={{width:'100%', padding:'12px', border:'1px solid #cbd5e1', borderRadius:'8px', background:'white', marginTop:'5px'}} /></div>
+            
+            <button onClick={()=>onUpdate(editedTask)} style={{width:'100%', padding:'15px', background:'#2563eb', color:'white', border:'none', borderRadius:'10px', cursor:'pointer', fontWeight:'bold', fontSize:'16px', marginBottom:'15px', boxShadow:'0 4px 6px rgba(37, 99, 235, 0.2)'}}>Enregistrer les modifications</button>
+            <button onClick={onDelete} style={{width:'100%', padding:'15px', color:'#ef4444', background:'#fee2e2', border:'none', borderRadius:'10px', cursor:'pointer', fontWeight:'bold', fontSize:'14px'}}>Supprimer la tâche</button>
+        </div>
+    );
+
+    // CONTENU CHAT (Discussion)
+    const ChatContent = () => (
+        <div style={{display:'flex', flexDirection:'column', height:'100%'}}>
+            <div style={{flex:1, overflowY:'auto', padding:'20px', display:'flex', flexDirection:'column', gap:'15px', background:'#f8fafc'}}>
+                {comments.length === 0 && <div style={{color:'#cbd5e1', textAlign:'center', marginTop:'50px'}}>Aucun message.</div>}
+                {comments.map(c => {
+                    const isMe = c.user_id === user.id;
+                    return (
+                        <div key={c.id} style={{display:'flex', justifyContent: isMe ? 'flex-end' : 'flex-start'}}>
+                            <div style={{maxWidth:'80%', background: isMe ? '#dbeafe' : 'white', padding:'12px', borderRadius:'12px', borderBottomRightRadius: isMe ? 0 : '12px', borderBottomLeftRadius: isMe ? '12px' : 0, boxShadow:'0 1px 2px rgba(0,0,0,0.05)', border:'1px solid #e2e8f0'}}>
+                                <div style={{fontSize:'10px', color: isMe ? '#1e40af' : '#64748b', fontWeight:'bold', marginBottom:'4px'}}>{c.username}</div>
+                                <div style={{color:'#334155', fontSize:'14px'}}>{c.content}</div>
+                                {c.file_data && <div style={{marginTop:'8px'}}>{c.file_type.startsWith('image/') ? (<img src={c.file_data} alt="pj" style={{maxWidth:'100%', borderRadius:'8px'}} />) : (<a href={c.file_data} download={c.file_name} style={{display:'block', padding:'8px', background:'rgba(0,0,0,0.05)', borderRadius:'6px', textDecoration:'none', color:'#2563eb', fontSize:'12px'}}>📎 {c.file_name}</a>)}</div>}
+                                <div style={{fontSize:'9px', color:'#94a3b8', textAlign:'right', marginTop:'5px'}}>{new Date(c.created_at).toLocaleTimeString().slice(0,5)}</div>
+                            </div>
+                        </div>
+                    );
+                })}
+            </div>
+            <div style={{padding:'10px', background:'white', borderTop:'1px solid #e2e8f0', display:'flex', alignItems:'center', gap:'10px'}}>
+                <input type="file" ref={fileInputRef} onChange={e=>setFile(e.target.files[0])} style={{display:'none'}} />
+                <button type="button" onClick={()=>fileInputRef.current.click()} style={{background:'#f1f5f9', border:'none', borderRadius:'50%', width:'40px', height:'40px', cursor:'pointer', fontSize:'20px', color:'#64748b'}}>📎</button>
+                <input value={newComment} onChange={e=>setNewComment(e.target.value)} placeholder={file ? `Fichier: ${file.name}` : "Votre message..."} style={{flex:1, padding:'12px', borderRadius:'20px', border:'1px solid #e2e8f0', fontSize:'14px', outline:'none', background:'#f8fafc'}} />
+                <button type="submit" onClick={handleSendComment} disabled={isUploading} style={{background:'#2563eb', color:'white', border:'none', borderRadius:'50%', width:'40px', height:'40px', cursor:'pointer', display:'flex', alignItems:'center', justifyContent:'center'}}>{isUploading ? '...' : '➤'}</button>
+            </div>
+        </div>
+    );
+
     return (
-        <div style={{position:'fixed', top:0, left:0, right:0, bottom:0, background:'rgba(0,0,0,0.5)', zIndex:2000, display:'flex', justifyContent:'center', alignItems:'center', padding: isMobile ? '0' : '20px'}}>
+        <div style={{position:'fixed', top:0, left:0, right:0, bottom:0, background: isMobile ? 'white' : 'rgba(0,0,0,0.5)', zIndex:2000, display:'flex', justifyContent:'center', alignItems:'center', padding: isMobile ? '0' : '20px'}}>
+            
+            {/* CONTAINER PRINCIPAL */}
             <div style={{
                 background:'white', 
-                width: isMobile ? '100%' : '800px', 
-                height: isMobile ? '100%' : '80vh', 
+                width: isMobile ? '100%' : '900px', 
+                height: isMobile ? '100%' : '85vh', 
                 borderRadius: isMobile ? '0' : '16px', 
                 display:'flex', 
-                flexDirection: isMobile ? 'column' : 'row', // 🔥 COLONNE SUR MOBILE
+                flexDirection: 'column', // Toujours colonne, le contenu change
                 overflow:'hidden', 
-                boxShadow:'0 25px 50px -12px rgba(0, 0, 0, 0.25)'
+                boxShadow: isMobile ? 'none' : '0 25px 50px -12px rgba(0, 0, 0, 0.25)'
             }}>
                 
-                {/* PARTIE 1 : DÉTAILS (Haut sur mobile, Gauche sur PC) */}
-                <div style={{
-                    width: isMobile ? '100%' : '40%', 
-                    padding: isMobile ? '20px' : '30px', 
-                    borderRight: isMobile ? 'none' : '1px solid #e2e8f0', 
-                    borderBottom: isMobile ? '1px solid #e2e8f0' : 'none',
-                    overflowY:'auto', 
-                    background:'#f8fafc',
-                    maxHeight: isMobile ? '50vh' : '100%' // Limite la hauteur sur mobile
-                }}>
-                    <div style={{display:'flex', justifyContent:'space-between', alignItems:'center', marginBottom:'20px'}}>
-                        <h3 style={{margin:0, color:'#1e293b'}}>Modifier</h3>
-                        {isMobile && <button onClick={onClose} style={{background:'#e2e8f0', border:'none', borderRadius:'50%', width:'30px', height:'30px', fontWeight:'bold'}}>✕</button>}
-                    </div>
-                    
-                    <input value={editedTask.title} onChange={e=>setEditedTask({...editedTask, title:e.target.value})} style={{width:'100%', padding:'12px', border:'1px solid #cbd5e1', borderRadius:'8px', fontSize:'15px', marginBottom:'20px'}} />
-                    <div style={{display: 'grid', gridTemplateColumns: '1fr 1fr', gap: '10px'}}>
-                        <div><label style={{fontSize:'12px', fontWeight:'bold', color:'#64748b'}}>STATUT</label><select value={editedTask.status} onChange={e=>setEditedTask({...editedTask, status:e.target.value})} style={{width:'100%', padding:'10px', borderRadius:'8px', border:'1px solid #cbd5e1', background:'white'}}><option value="todo">À faire</option><option value="doing">En cours</option><option value="done">Terminé</option></select></div>
-                        <div><label style={{fontSize:'12px', fontWeight:'bold', color:'#64748b'}}>PRIORITÉ</label><select value={editedTask.priority} onChange={e=>setEditedTask({...editedTask, priority:e.target.value})} style={{width:'100%', padding:'10px', borderRadius:'8px', border:'1px solid #cbd5e1', background:'white'}}><option value="low">Basse</option><option value="normal">Normale</option><option value="high">Haute 🔥</option></select></div>
-                    </div>
-                    {user.role === 'admin' && <div style={{marginTop:'15px'}}><label style={{fontSize:'12px', fontWeight:'bold', color:'#64748b'}}>RESPONSABLE</label><select value={editedTask.assignee_id || ''} onChange={e=>setEditedTask({...editedTask, assignee_id:parseInt(e.target.value)})} style={{width:'100%', padding:'10px', borderRadius:'8px', border:'1px solid #cbd5e1', background:'white'}}><option value="">-- Personne --</option>{allUsers.map(u => <option key={u.id} value={u.id}>{u.username}</option>)}</select></div>}
-                    <div style={{marginTop:'15px'}}><label style={{fontSize:'12px', fontWeight:'bold', color:'#64748b'}}>ÉCHÉANCE</label><input type="date" value={editedTask.due_date ? editedTask.due_date.split('T')[0] : ''} onChange={e=>setEditedTask({...editedTask, due_date:e.target.value})} style={{width:'100%', padding:'10px', border:'1px solid #cbd5e1', borderRadius:'8px', background:'white', marginBottom:'30px'}} /></div>
-                    
-                    <div style={{display:'flex', flexDirection:'column', gap:'10px'}}>
-                        <button onClick={()=>onUpdate(editedTask)} style={{padding:'12px', background:'#2563eb', color:'white', border:'none', borderRadius:'8px', cursor:'pointer', fontWeight:'bold'}}>Enregistrer</button>
-                        <div style={{display:'flex', justifyContent:'space-between'}}>
-                             {!isMobile && <button onClick={onClose} style={{padding:'10px', border:'none', background:'transparent', color:'#64748b', cursor:'pointer'}}>Fermer</button>}
-                             <button onClick={onDelete} style={{color:'#ef4444', background:'none', border:'none', cursor:'pointer', fontSize:'12px'}}>Supprimer</button>
-                        </div>
-                    </div>
+                {/* HEADER (Titre + Close) */}
+                <div style={{padding:'15px 20px', borderBottom:'1px solid #e2e8f0', display:'flex', justifyContent:'space-between', alignItems:'center', background:'white'}}>
+                    <h3 style={{margin:0, color:'#1e293b', fontSize:'18px'}}>
+                        {isMobile ? (activeTab === 'details' ? '📝 Détails' : '💬 Discussion') : 'Modification Tâche'}
+                    </h3>
+                    <button onClick={onClose} style={{background:'#f1f5f9', border:'none', borderRadius:'50%', width:'36px', height:'36px', fontWeight:'bold', fontSize:'16px', color:'#64748b', cursor:'pointer'}}>✕</button>
                 </div>
 
-                {/* PARTIE 2 : CHAT (Bas sur mobile, Droite sur PC) */}
-                <div style={{flex:1, display:'flex', flexDirection:'column', background:'white', height: isMobile ? '50vh' : '100%'}}>
-                    <div style={{padding:'15px', borderBottom:'1px solid #e2e8f0', fontWeight:'bold', color:'#334155', fontSize:'14px'}}>💬 Commentaires</div>
-                    <div style={{flex:1, overflowY:'auto', padding:'15px', display:'flex', flexDirection:'column', gap:'15px'}}>
-                        {comments.length === 0 && <div style={{color:'#cbd5e1', textAlign:'center', marginTop:'20px'}}>Aucun message.</div>}
-                        {comments.map(c => (
-                            <div key={c.id} style={{display:'flex', gap:'10px', alignItems:'flex-start'}}>
-                                <div style={{width:'25px', height:'25px', borderRadius:'50%', background:'#e2e8f0', display:'flex', alignItems:'center', justifyContent:'center', fontSize:'10px', fontWeight:'bold', color:'#64748b'}}>{c.username.charAt(0)}</div>
-                                <div style={{maxWidth:'85%'}}>
-                                    <div style={{fontSize:'10px', color:'#94a3b8', marginBottom:'2px'}}><b>{c.username}</b></div>
-                                    <div style={{background:'#f1f5f9', padding:'8px', borderRadius:'0 10px 10px 10px', color:'#334155', fontSize:'13px'}}>{c.content}{c.file_data && (<div style={{marginTop:'5px'}}>{c.file_type.startsWith('image/') ? (<img src={c.file_data} alt="pj" style={{maxWidth:'100%', borderRadius:'6px', border:'1px solid #e2e8f0'}} />) : (<a href={c.file_data} download={c.file_name} style={{display:'flex', alignItems:'center', gap:'5px', textDecoration:'none', color:'#2563eb', fontSize:'12px'}}>📎 {c.file_name}</a>)}</div>)}</div>
-                                </div>
-                            </div>
-                        ))}
+                {/* TABS (Seulement sur Mobile) */}
+                {isMobile && (
+                    <div style={{display:'flex', borderBottom:'1px solid #e2e8f0'}}>
+                        <div onClick={()=>setActiveTab('details')} style={{flex:1, padding:'15px', textAlign:'center', fontWeight:'bold', color: activeTab==='details'?'#2563eb':'#64748b', borderBottom: activeTab==='details'?'2px solid #2563eb':'none', background: activeTab==='details'?'#eff6ff':'white'}}>Fiche</div>
+                        <div onClick={()=>setActiveTab('chat')} style={{flex:1, padding:'15px', textAlign:'center', fontWeight:'bold', color: activeTab==='chat'?'#2563eb':'#64748b', borderBottom: activeTab==='chat'?'2px solid #2563eb':'none', background: activeTab==='chat'?'#eff6ff':'white'}}>Chat ({comments.length})</div>
                     </div>
-                    <div style={{padding:'10px', borderTop:'1px solid #e2e8f0', background:'#f8fafc'}}>
-                        <form onSubmit={handleSendComment} style={{display:'flex', gap:'5px'}}>
-                            <input type="file" ref={fileInputRef} onChange={e=>setFile(e.target.files[0])} style={{display:'none'}} />
-                            <button type="button" onClick={()=>fileInputRef.current.click()} style={{background:'white', border:'1px solid #cbd5e1', borderRadius:'8px', width:'40px', cursor:'pointer', fontSize:'18px'}} title="Joindre">📎</button>
-                            <input value={newComment} onChange={e=>setNewComment(e.target.value)} placeholder={file ? `File: ${file.name}` : "Message..."} style={{flex:1, padding:'10px', borderRadius:'8px', border:'1px solid #cbd5e1', fontSize:'13px'}} />
-                            <button type="submit" disabled={isUploading} style={{background: isUploading ? '#cbd5e1' : '#10b981', color:'white', border:'none', borderRadius:'8px', padding:'0 15px', fontWeight:'bold', cursor: isUploading ? 'wait' : 'pointer'}}>{isUploading ? '...' : '➤'}</button>
-                        </form>
-                    </div>
+                )}
+
+                {/* CORPS DE LA FENÊTRE */}
+                <div style={{flex:1, overflow:'hidden', display:'flex'}}>
+                    {isMobile ? (
+                        // MODE MOBILE : On affiche l'un OU l'autre
+                        <div style={{width:'100%', height:'100%'}}>
+                            {activeTab === 'details' ? <DetailsContent /> : <ChatContent />}
+                        </div>
+                    ) : (
+                        // MODE PC : On affiche les deux côte à côte
+                        <>
+                            <div style={{width:'40%', borderRight:'1px solid #e2e8f0', background:'#f8fafc'}}><DetailsContent /></div>
+                            <div style={{flex:1, background:'white'}}><ChatContent /></div>
+                        </>
+                    )}
                 </div>
             </div>
         </div>
     );
 }
 
+// ==========================================
+// 4. SIDEBAR
+// ==========================================
 function Sidebar({ sites, projects, activeProject, setActiveProject, onLogout, onCreateProject, onUpdateProject, onCreateSite, onUpdateSite, onDeleteSite, user, setPage, closeMobileMenu }) {
     const [expandedSites, setExpandedSites] = useState({});
     const toggleSite = (id) => setExpandedSites(prev => ({...prev, [id]: !prev[id]}));
@@ -215,6 +231,9 @@ function Sidebar({ sites, projects, activeProject, setActiveProject, onLogout, o
     );
 }
 
+// ==========================================
+// 5. MAIN APP
+// ==========================================
 function App() {
     const [user, setUser] = useState(JSON.parse(localStorage.getItem('user')) || null);
     const [currentPage, setCurrentPage] = useState('dashboard');
