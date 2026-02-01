@@ -7,7 +7,7 @@ const nodemailer = require("nodemailer");
 require("dotenv").config();
 
 const app = express();
-// AUGMENTATION DE LA LIMITE POUR LES FICHIERS (IMAGES/PDF)
+// ⚠️ TRES IMPORTANT : On autorise les gros fichiers (50 Mo)
 app.use(express.json({ limit: '50mb' }));
 app.use(express.urlencoded({ limit: '50mb', extended: true }));
 app.use(cors());
@@ -21,21 +21,33 @@ const pool = new Pool({
   ssl: { rejectUnauthorized: false }
 });
 
-// CRÉATION AUTOMATIQUE DE LA TABLE COMMENTAIRES (Au démarrage)
-pool.query(`
-  CREATE TABLE IF NOT EXISTS comments (
-    id SERIAL PRIMARY KEY,
-    task_id INT REFERENCES tasks(id) ON DELETE CASCADE,
-    user_id INT REFERENCES users(id) ON DELETE CASCADE,
-    content TEXT,
-    file_data TEXT,
-    file_name TEXT,
-    file_type TEXT,
-    created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP
-  )
-`).catch(err => console.error("Erreur création table comments", err));
+// --- 🛠️ RÉPARATION AUTOMATIQUE DE LA BASE DE DONNÉES ---
+const initDB = async () => {
+    try {
+        // 1. Créer la table si elle n'existe pas
+        await pool.query(`
+          CREATE TABLE IF NOT EXISTS comments (
+            id SERIAL PRIMARY KEY,
+            task_id INT REFERENCES tasks(id) ON DELETE CASCADE,
+            user_id INT REFERENCES users(id) ON DELETE CASCADE,
+            content TEXT,
+            created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP
+          )
+        `);
+        
+        // 2. FORCER L'AJOUT DES COLONNES FICHIERS (Si elles manquent)
+        await pool.query("ALTER TABLE comments ADD COLUMN IF NOT EXISTS file_data TEXT");
+        await pool.query("ALTER TABLE comments ADD COLUMN IF NOT EXISTS file_name TEXT");
+        await pool.query("ALTER TABLE comments ADD COLUMN IF NOT EXISTS file_type TEXT");
+        
+        console.log("✅ Base de données mise à jour avec succès (Colonnes Fichiers)");
+    } catch (err) {
+        console.error("❌ Erreur initDB:", err);
+    }
+};
+initDB();
+// ---------------------------------------------------------
 
-// CONFIG FACTEUR EMAIL
 const transporter = nodemailer.createTransport({
   service: 'gmail',
   auth: { user: process.env.EMAIL_USER, pass: process.env.EMAIL_PASS }
@@ -47,8 +59,6 @@ const sendEmail = async (to, subject, html) => {
 };
 
 // --- ROUTES ---
-
-// LOGIN
 app.post("/login", async (req, res) => {
   const { email, password } = req.body;
   try {
@@ -62,13 +72,10 @@ app.post("/login", async (req, res) => {
   } catch (err) { res.status(500).json({ message: "Erreur serveur" }); }
 });
 
-// COMMENTAIRES (NOUVEAU !)
+// COMMENTAIRES & FICHIERS
 app.get("/comments/:taskId", async (req, res) => {
     try {
-        const result = await pool.query(
-            "SELECT c.*, u.username FROM comments c JOIN users u ON c.user_id = u.id WHERE c.task_id = $1 ORDER BY c.created_at ASC",
-            [req.params.taskId]
-        );
+        const result = await pool.query("SELECT c.*, u.username FROM comments c JOIN users u ON c.user_id = u.id WHERE c.task_id = $1 ORDER BY c.created_at ASC", [req.params.taskId]);
         res.json(result.rows);
     } catch (e) { res.status(500).send(e); }
 });
@@ -80,14 +87,9 @@ app.post("/comments", async (req, res) => {
             "INSERT INTO comments (task_id, user_id, content, file_data, file_name, file_type) VALUES ($1, $2, $3, $4, $5, $6)",
             [task_id, user_id, content, file_data, file_name, file_type]
         );
-        
-        // Notification Email (Optionnel : prévenir le propriétaire de la tâche)
-        // (Code simplifié pour l'instant pour éviter les spams)
-        
         res.sendStatus(201);
-    } catch (e) { console.error(e); res.status(500).send(e); }
+    } catch (e) { console.error(e); res.status(500).send("Erreur enregistrement commentaire"); }
 });
-
 
 // UTILISATEURS
 app.get("/users", async (req, res) => { try { res.json((await pool.query("SELECT id, username, email, role FROM users ORDER BY id")).rows); } catch(e) { res.status(500).send(e); } });
@@ -102,7 +104,7 @@ app.post("/users", async (req, res) => {
 });
 app.delete("/users/:id", async (req, res) => { try { await pool.query("UPDATE tasks SET assignee_id = NULL WHERE assignee_id = $1", [req.params.id]); await pool.query("DELETE FROM users WHERE id = $1", [req.params.id]); res.sendStatus(200); } catch(e) { res.status(500).send(e); } });
 
-// SITES & PROJETS & TÂCHES (Standard)
+// SITES, PROJETS, TÂCHES
 app.get("/sites", async (req, res) => { try { res.json((await pool.query("SELECT * FROM sites ORDER BY id")).rows); } catch(e) { res.status(500).send(e); } });
 app.post("/sites", async (req, res) => { try { await pool.query("INSERT INTO sites (name) VALUES ($1)", [req.body.name]); res.sendStatus(201); } catch(e) { res.status(500).send(e); } });
 app.put("/sites/:id", async (req, res) => { try { await pool.query("UPDATE sites SET name = $1 WHERE id = $2", [req.body.name, req.params.id]); res.sendStatus(200); } catch(e) { res.status(500).send(e); } });
