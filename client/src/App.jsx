@@ -29,7 +29,7 @@ import autoTable from 'jspdf-autotable';
 // --- CONFIGURATION ---
 // Si vous êtes en local, c'est localhost:5000. 
 // Si vous publiez sur Render, il faudra mettre l'adresse https://....
-const API_BASE = "http://localhost:5000"; 
+const API_BASE = "https://medina-api.onrender.com"; 
 
 // ==========================================
 // COMPOSANT 1 : DASHBOARD (ACCUEIL COCKPIT)
