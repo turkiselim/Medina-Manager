@@ -258,11 +258,101 @@ function MembersView({ user }) {
 
 function ProjectView({ project, tasks, members, allUsers, viewMode, setViewMode, onAddTask, onEditTask, onUpdateTask, onInvite, onDeleteProject, user }) {
     const [newTask, setNewTask] = useState("");
+
+    // --- LOGIC DE DÉBOGAGE (Affiche dans la console du navigateur ce qu'il reçoit) ---
+    console.log("PROJET:", project.name, "| TÂCHES REÇUES:", tasks.length, tasks);
+
     const dragStart = (e, id) => e.dataTransfer.setData("taskId", id);
-    const drop = (e, status) => { const id=e.dataTransfer.getData("taskId"); const t=tasks.find(x=>x.id.toString()===id); if(t && t.status!==status) onUpdateTask({...t, status}); };
-    const getName = (id) => { const u=allUsers.find(x=>x.id===id); return u?u.username:'-'; };
-    const exportPDF = () => { const doc = new jsPDF(); doc.text(`Rapport Projet: ${project.name}`, 14, 20); doc.setFontSize(10); doc.text(`Généré le ${new Date().toLocaleDateString()}`, 14, 28); const tableData = tasks.map(t => [t.title, t.status, getName(t.assignee_id), t.due_date ? new Date(t.due_date).toLocaleDateString() : '-']); autoTable(doc, { head: [['Tâche', 'Statut', 'Assigné à', 'Échéance']], body: tableData, startY: 35 }); doc.save(`${project.name}_rapport.pdf`); };
-    return ( <div style={{padding:'20px', height:'100%', display:'flex', flexDirection:'column', background:'white'}}><div className="project-header" style={{display:'flex', justifyContent:'space-between', alignItems:'center', marginBottom:'15px'}}><div style={{display:'flex', alignItems:'center', gap:'10px'}}><div style={{width:'32px', height:'32px', background:'#f06a6a', borderRadius:'6px', display:'flex', alignItems:'center', justifyContent:'center', color:'white', fontSize:'14px', fontWeight:'bold'}}>{project.name.charAt(0)}</div><h2 style={{margin:0, fontSize:'18px'}}>{project.name}</h2></div><div style={{display:'flex', gap:'5px'}}><button onClick={exportPDF} style={{background:'#fff', border:'1px solid #ccc', padding:'5px 10px', borderRadius:'6px', fontSize:'12px', cursor:'pointer', color:'#333'}}>📄 PDF</button>{user.role==='admin' && <button onClick={()=>onDeleteProject(project.id)} style={{background:'#fee2e2', color:'red', border:'none', padding:'5px 10px', borderRadius:'6px', fontSize:'12px'}}>Supprimer</button>}</div></div><div className="view-buttons" style={{display:'flex', gap:'5px', marginBottom:'15px', background:'#f1f5f9', padding:'3px', borderRadius:'6px'}}><button onClick={()=>setViewMode('board')} style={{padding:'8px 12px', border:'none', borderRadius:'4px', background:viewMode==='board'?'white':'transparent', fontWeight:viewMode==='board'?'bold':'normal', fontSize:'13px'}}>Kanban</button><button onClick={()=>setViewMode('list')} style={{padding:'8px 12px', border:'none', borderRadius:'4px', background:viewMode==='list'?'white':'transparent', fontWeight:viewMode==='list'?'bold':'normal', fontSize:'13px'}}>Liste</button><button onClick={()=>setViewMode('timeline')} style={{padding:'8px 12px', border:'none', borderRadius:'4px', background:viewMode==='timeline'?'white':'transparent', fontWeight:viewMode==='timeline'?'bold':'normal', fontSize:'13px'}}>Gantt</button></div>{viewMode==='board' && <div className="kanban-board">{['todo', 'doing', 'done'].map(s=>(<div key={s} className="kanban-col" onDragOver={e=>e.preventDefault()} onDrop={e=>drop(e,s)}><div style={{fontWeight:'bold', marginBottom:'10px', textTransform:'uppercase', color:'#666', fontSize:'12px'}}>{s}</div>{s==='todo' && user.role==='admin' && <form onSubmit={e=>{e.preventDefault(); onAddTask(newTask); setNewTask("");}}><input placeholder="+ Tâche" value={newTask} onChange={e=>setNewTask(e.target.value)} style={{width:'100%', padding:'10px', marginBottom:'10px', border:'1px solid white', borderRadius:'6px'}}/></form>}<div style={{display:'flex', flexDirection:'column', gap:'10px'}}>{tasks.filter(t=>t.status===s).map(t=>(<div key={t.id} draggable="true" onDragStart={e=>dragStart(e,t.id)} onClick={()=>onEditTask(t)} style={{background:'white', padding:'12px', borderRadius:'8px', boxShadow:'0 1px 2px rgba(0,0,0,0.05)', borderLeft:`3px solid ${t.priority==='high'?'red':'transparent'}`}}><div style={{fontWeight:'500', fontSize:'14px'}}>{t.title}</div><div style={{fontSize:'11px', color:'#888', marginTop:'5px'}}>{getName(t.assignee_id)} • {t.due_date?new Date(t.due_date).toLocaleDateString().slice(0,5):''}</div></div>))}</div></div>))}</div>}{viewMode==='list' && <div style={{background:'white', borderRadius:'8px', border:'1px solid #eee', overflow:'hidden', overflowX:'auto'}}><table style={{width:'100%', borderCollapse:'collapse', minWidth:'500px'}}><thead style={{background:'#f9f9f9'}}><tr><th style={{padding:'10px', textAlign:'left', fontSize:'12px'}}>Titre</th><th style={{padding:'10px', textAlign:'left', fontSize:'12px'}}>Statut</th><th style={{padding:'10px', textAlign:'left', fontSize:'12px'}}>Assigné</th></tr></thead><tbody>{tasks.map(t=>(<tr key={t.id} onClick={()=>onEditTask(t)} style={{borderBottom:'1px solid #eee'}}><td style={{padding:'10px', fontSize:'13px'}}>{t.title}</td><td style={{padding:'10px', fontSize:'12px'}}>{t.status}</td><td style={{padding:'10px', fontSize:'12px'}}>{getName(t.assignee_id)}</td></tr>))}</tbody></table></div>}{viewMode==='timeline' && <GanttView tasks={tasks} onEditTask={onEditTask} />}</div> );
+    const drop = (e, status) => { 
+        const id = e.dataTransfer.getData("taskId"); 
+        const t = tasks.find(x => x.id.toString() === id); 
+        if (t && t.status !== status) onUpdateTask({...t, status}); 
+    };
+    
+    const getName = (id) => { const u = allUsers.find(x => x.id === id); return u ? u.username : '-'; };
+    
+    // Fonction PDF
+    const exportPDF = () => { 
+        const doc = new jsPDF(); 
+        doc.text(`Rapport Projet: ${project.name}`, 14, 20); 
+        doc.setFontSize(10); 
+        const tableData = tasks.map(t => [t.title, t.status, getName(t.assignee_id), t.due_date ? new Date(t.due_date).toLocaleDateString() : '-']); 
+        autoTable(doc, { head: [['Tâche', 'Statut', 'Assigné à', 'Échéance']], body: tableData, startY: 35 }); 
+        doc.save(`${project.name}_rapport.pdf`); 
+    };
+
+    return ( 
+        <div style={{padding:'20px', height:'100%', display:'flex', flexDirection:'column', background:'white'}}>
+            
+            {/* EN-TÊTE PROJET */}
+            <div className="project-header" style={{display:'flex', justifyContent:'space-between', alignItems:'center', marginBottom:'15px'}}>
+                <div style={{display:'flex', alignItems:'center', gap:'10px'}}>
+                    <div style={{width:'32px', height:'32px', background:'#f06a6a', borderRadius:'6px', display:'flex', alignItems:'center', justifyContent:'center', color:'white', fontSize:'14px', fontWeight:'bold'}}>{project.name.charAt(0)}</div>
+                    <h2 style={{margin:0, fontSize:'18px'}}>{project.name}</h2>
+                    <span style={{fontSize:'12px', color:'#888', background:'#eee', padding:'2px 8px', borderRadius:'10px'}}>{tasks.length} tâches</span>
+                </div>
+                <div style={{display:'flex', gap:'5px'}}>
+                    <button onClick={exportPDF} style={{background:'#fff', border:'1px solid #ccc', padding:'5px 10px', borderRadius:'6px', fontSize:'12px', cursor:'pointer', color:'#333'}}>📄 PDF</button>
+                    {user.role==='admin' && <button onClick={()=>onDeleteProject(project.id)} style={{background:'#fee2e2', color:'red', border:'none', padding:'5px 10px', borderRadius:'6px', fontSize:'12px'}}>Supprimer</button>}
+                </div>
+            </div>
+
+            {/* BOUTONS DE VUE */}
+            <div className="view-buttons" style={{display:'flex', gap:'5px', marginBottom:'15px', background:'#f1f5f9', padding:'3px', borderRadius:'6px'}}>
+                <button onClick={()=>setViewMode('board')} style={{padding:'8px 12px', border:'none', borderRadius:'4px', background:viewMode==='board'?'white':'transparent', fontWeight:viewMode==='board'?'bold':'normal', fontSize:'13px'}}>Kanban</button>
+                <button onClick={()=>setViewMode('list')} style={{padding:'8px 12px', border:'none', borderRadius:'4px', background:viewMode==='list'?'white':'transparent', fontWeight:viewMode==='list'?'bold':'normal', fontSize:'13px'}}>Liste</button>
+                <button onClick={()=>setViewMode('timeline')} style={{padding:'8px 12px', border:'none', borderRadius:'4px', background:viewMode==='timeline'?'white':'transparent', fontWeight:viewMode==='timeline'?'bold':'normal', fontSize:'13px'}}>Gantt</button>
+            </div>
+
+            {/* --- VUE KANBAN (BOARD) --- */}
+            {viewMode==='board' && 
+                <div className="kanban-board">
+                    {['todo', 'doing', 'done'].map(s => (
+                        <div key={s} className="kanban-col" onDragOver={e=>e.preventDefault()} onDrop={e=>drop(e,s)}>
+                            <div style={{fontWeight:'bold', marginBottom:'10px', textTransform:'uppercase', color:'#666', fontSize:'12px'}}>
+                                {s === 'todo' ? 'À FAIRE' : s === 'doing' ? 'EN COURS' : 'TERMINÉ'}
+                            </div>
+                            
+                            {/* Formulaire ajout rapide */}
+                            {s==='todo' && user.role==='admin' && 
+                                <form onSubmit={e=>{e.preventDefault(); onAddTask(newTask); setNewTask("");}}>
+                                    <input placeholder="+ Tâche" value={newTask} onChange={e=>setNewTask(e.target.value)} style={{width:'100%', padding:'10px', marginBottom:'10px', border:'1px solid white', borderRadius:'6px'}}/>
+                                </form>
+                            }
+
+                            {/* Liste des cartes - FILTRE PLUS TOLÉRANT */}
+                            <div style={{display:'flex', flexDirection:'column', gap:'10px'}}>
+                                {tasks
+                                    .filter(t => (t.status || 'todo').toLowerCase() === s) // Sécurité anti-bug
+                                    .map(t => (
+                                        <div key={t.id} draggable="true" onDragStart={e=>dragStart(e,t.id)} onClick={()=>onEditTask(t)} style={{background:'white', padding:'12px', borderRadius:'8px', boxShadow:'0 1px 2px rgba(0,0,0,0.05)', borderLeft:`3px solid ${t.priority==='high'?'red':'transparent'}`, cursor:'pointer'}}>
+                                            <div style={{fontWeight:'500', fontSize:'14px'}}>{t.title}</div>
+                                            <div style={{fontSize:'11px', color:'#888', marginTop:'5px'}}>{getName(t.assignee_id)} • {t.due_date ? new Date(t.due_date).toLocaleDateString().slice(0,5) : ''}</div>
+                                        </div>
+                                    ))
+                                }
+                            </div>
+                        </div>
+                    ))}
+                </div>
+            }
+
+            {/* --- VUE LISTE --- */}
+            {viewMode==='list' && 
+                <div style={{background:'white', borderRadius:'8px', border:'1px solid #eee', overflow:'hidden', overflowX:'auto'}}>
+                    <table style={{width:'100%', borderCollapse:'collapse', minWidth:'500px'}}>
+                        <thead style={{background:'#f9f9f9'}}><tr><th style={{padding:'10px', textAlign:'left', fontSize:'12px'}}>Titre</th><th style={{padding:'10px', textAlign:'left', fontSize:'12px'}}>Statut</th><th style={{padding:'10px', textAlign:'left', fontSize:'12px'}}>Assigné</th></tr></thead>
+                        <tbody>
+                            {tasks.map(t=>(<tr key={t.id} onClick={()=>onEditTask(t)} style={{borderBottom:'1px solid #eee', cursor:'pointer'}}><td style={{padding:'10px', fontSize:'13px'}}>{t.title}</td><td style={{padding:'10px', fontSize:'12px'}}>{t.status}</td><td style={{padding:'10px', fontSize:'12px'}}>{getName(t.assignee_id)}</td></tr>))}
+                        </tbody>
+                    </table>
+                </div>
+            }
+
+            {/* --- VUE GANTT --- */}
+            {viewMode==='timeline' && <GanttView tasks={tasks} onEditTask={onEditTask} />}
+        </div> 
+    );
 }
 
 function TrashView() {
@@ -318,4 +408,4 @@ export default function App() {
         </div>
     </div>
   )
-} 
+}    
