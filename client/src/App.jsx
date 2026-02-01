@@ -382,6 +382,7 @@ function App() {
             </div>
 
             {/* MODAL ÉDITION */}
+            {/* MODAL ÉDITION */}
             {editingTask && (
                 <div style={{position:'fixed', top:0, left:0, right:0, bottom:0, background:'rgba(0,0,0,0.6)', zIndex:2000, display:'flex', justifyContent:'center', alignItems:'center', padding:'20px'}}>
                     <div style={{background:'white', padding:'25px', borderRadius:'12px', width:'100%', maxWidth:'400px', display:'flex', flexDirection:'column', gap:'15px', boxShadow:'0 20px 25px -5px rgba(0, 0, 0, 0.1)'}}>
@@ -401,7 +402,6 @@ function App() {
                             </select>
                         </div>
 
-                        {/* Seul l'admin peut réassigner une tâche */}
                         {user.role === 'admin' && (
                             <select value={editingTask.assignee_id || ''} onChange={e=>setEditingTask({...editingTask, assignee_id:parseInt(e.target.value)})} style={{padding:'10px', borderRadius:'6px', border:'1px solid #cbd5e1'}}>
                                 <option value="">-- Assigner à --</option>
@@ -412,9 +412,28 @@ function App() {
                         <label style={{fontSize:'12px', color:'#64748b', marginBottom:'-10px'}}>Date d'échéance</label>
                         <input type="date" value={editingTask.due_date ? editingTask.due_date.split('T')[0] : ''} onChange={e=>setEditingTask({...editingTask, due_date:e.target.value})} style={{padding:'10px', border:'1px solid #cbd5e1', borderRadius:'6px'}} />
 
-                        <div style={{display:'flex', justifyContent:'flex-end', gap:'10px', marginTop:'10px'}}>
-                            <button onClick={()=>setEditingTask(null)} style={{padding:'10px 20px', border:'none', background:'#f1f5f9', color:'#475569', borderRadius:'6px', cursor:'pointer'}}>Annuler</button>
-                            <button onClick={async ()=>{ await fetch(`${API_BASE}/tasks/${editingTask.id}`, { method:'PUT', headers:{'Content-Type':'application/json'}, body:JSON.stringify(editingTask)}); fetchData(); setEditingTask(null); }} style={{padding:'10px 20px', background:'#2563eb', color:'white', border:'none', borderRadius:'6px', cursor:'pointer'}}>Enregistrer</button>
+                        {/* --- ZONE BOUTONS (Mise à jour V4) --- */}
+                        <div style={{display:'flex', justifyContent:'space-between', alignItems:'center', marginTop:'10px'}}>
+                            
+                            {/* Bouton Supprimer (Rouge, à gauche) */}
+                            <button 
+                                onClick={async ()=>{ 
+                                    if(confirm("Voulez-vous vraiment supprimer cette tâche ?")) {
+                                        await fetch(`${API_BASE}/tasks/${editingTask.id}`, { method:'DELETE' });
+                                        fetchData(); 
+                                        setEditingTask(null); 
+                                    }
+                                }} 
+                                style={{background:'transparent', color:'#ef4444', border:'none', fontSize:'13px', cursor:'pointer', textDecoration:'underline'}}
+                            >
+                                Supprimer
+                            </button>
+
+                            {/* Boutons Annuler / Enregistrer (Droite) */}
+                            <div style={{display:'flex', gap:'10px'}}>
+                                <button onClick={()=>setEditingTask(null)} style={{padding:'10px 20px', border:'none', background:'#f1f5f9', color:'#475569', borderRadius:'6px', cursor:'pointer'}}>Annuler</button>
+                                <button onClick={async ()=>{ await fetch(`${API_BASE}/tasks/${editingTask.id}`, { method:'PUT', headers:{'Content-Type':'application/json'}, body:JSON.stringify(editingTask)}); fetchData(); setEditingTask(null); }} style={{padding:'10px 20px', background:'#2563eb', color:'white', border:'none', borderRadius:'6px', cursor:'pointer'}}>Enregistrer</button>
+                            </div>
                         </div>
                     </div>
                 </div>
