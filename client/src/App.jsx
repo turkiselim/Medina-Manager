@@ -5,17 +5,73 @@ import autoTable from 'jspdf-autotable';
 const API_BASE = "https://medina-api.onrender.com"; 
 
 // ==========================================
-// COMPOSANTS PAGES
+// COMPOSANT 1 : GESTION ÉQUIPE (RESTITUÉ)
 // ==========================================
-function MembersView({ users }) {
+function MembersView({ users, currentUser, onAddUser, onDeleteUser }) {
+    const [isAdding, setIsAdding] = useState(false);
+    const [newUser, setNewUser] = useState({ username: '', email: '', password: '', role: 'user' });
+
+    const handleSubmit = (e) => {
+        e.preventDefault();
+        if(!newUser.username || !newUser.email || !newUser.password) return alert("Tout remplir svp");
+        onAddUser(newUser);
+        setIsAdding(false);
+        setNewUser({ username: '', email: '', password: '', role: 'user' });
+    };
+
     return (
         <div style={{padding:'40px', background:'#f8fafc', minHeight:'100vh'}}>
-            <h1 style={{fontSize:'24px', color:'#1e293b', marginBottom:'10px'}}>👥 L'Équipe Medina</h1>
-            <div style={{display:'grid', gridTemplateColumns:'repeat(auto-fill, minmax(280px, 1fr))', gap:'20px'}}>
+            <div style={{display:'flex', justifyContent:'space-between', alignItems:'center', marginBottom:'30px'}}>
+                <div>
+                    <h1 style={{fontSize:'24px', color:'#1e293b', marginBottom:'5px'}}>👥 L'Équipe Medina</h1>
+                    <p style={{color:'#64748b'}}>Gérez les accès à la plateforme.</p>
+                </div>
+                {currentUser.role === 'admin' && (
+                    <button onClick={()=>setIsAdding(true)} style={{background:'#2563eb', color:'white', border:'none', padding:'10px 20px', borderRadius:'8px', cursor:'pointer', fontWeight:'bold', display:'flex', alignItems:'center', gap:'8px'}}>
+                        + Ajouter un membre
+                    </button>
+                )}
+            </div>
+
+            {/* FORMULAIRE AJOUT */}
+            {isAdding && (
+                <div style={{background:'white', padding:'25px', borderRadius:'12px', boxShadow:'0 10px 25px rgba(0,0,0,0.05)', marginBottom:'30px', border:'1px solid #e2e8f0'}}>
+                    <h3 style={{marginTop:0}}>Nouveau Collaborateur</h3>
+                    <form onSubmit={handleSubmit} style={{display:'grid', gridTemplateColumns:'repeat(auto-fit, minmax(200px, 1fr))', gap:'15px'}}>
+                        <input placeholder="Nom complet" value={newUser.username} onChange={e=>setNewUser({...newUser, username:e.target.value})} style={{padding:'10px', border:'1px solid #cbd5e1', borderRadius:'6px'}} />
+                        <input placeholder="Email" value={newUser.email} onChange={e=>setNewUser({...newUser, email:e.target.value})} style={{padding:'10px', border:'1px solid #cbd5e1', borderRadius:'6px'}} />
+                        <input placeholder="Mot de passe provisoire" type="password" value={newUser.password} onChange={e=>setNewUser({...newUser, password:e.target.value})} style={{padding:'10px', border:'1px solid #cbd5e1', borderRadius:'6px'}} />
+                        <select value={newUser.role} onChange={e=>setNewUser({...newUser, role:e.target.value})} style={{padding:'10px', border:'1px solid #cbd5e1', borderRadius:'6px'}}>
+                            <option value="user">Collaborateur</option>
+                            <option value="admin">Administrateur</option>
+                        </select>
+                        <div style={{display:'flex', gap:'10px'}}>
+                            <button type="button" onClick={()=>setIsAdding(false)} style={{background:'#f1f5f9', border:'none', padding:'10px', borderRadius:'6px', cursor:'pointer'}}>Annuler</button>
+                            <button type="submit" style={{background:'#10b981', color:'white', border:'none', padding:'10px', borderRadius:'6px', cursor:'pointer', flex:1, fontWeight:'bold'}}>Valider</button>
+                        </div>
+                    </form>
+                </div>
+            )}
+
+            {/* LISTE */}
+            <div style={{display:'grid', gridTemplateColumns:'repeat(auto-fill, minmax(300px, 1fr))', gap:'20px'}}>
                 {users.map(u => (
-                    <div key={u.id} style={{background:'white', padding:'20px', borderRadius:'12px', boxShadow:'0 2px 5px rgba(0,0,0,0.05)', display:'flex', alignItems:'center', gap:'15px', border:'1px solid #f1f5f9'}}>
-                        <div style={{width:'50px', height:'50px', background: u.role==='admin'?'#1e293b':'#3b82f6', color:'white', borderRadius:'50%', display:'flex', alignItems:'center', justifyContent:'center', fontSize:'18px', fontWeight:'bold'}}>{u.username.charAt(0).toUpperCase()}</div>
-                        <div><div style={{fontWeight:'bold', color:'#1e293b', fontSize:'16px'}}>{u.username}</div><div style={{color: u.role==='admin'?'#ef4444':'#64748b', fontSize:'12px', textTransform:'uppercase', fontWeight:'bold'}}>{u.role==='admin'?'🛡️ Administrateur':'👤 Collaborateur'}</div></div>
+                    <div key={u.id} style={{background:'white', padding:'20px', borderRadius:'12px', boxShadow:'0 2px 5px rgba(0,0,0,0.05)', display:'flex', alignItems:'center', gap:'15px', border:'1px solid #f1f5f9', position:'relative'}}>
+                        <div style={{width:'50px', height:'50px', background: u.role==='admin'?'#1e293b':'#3b82f6', color:'white', borderRadius:'50%', display:'flex', alignItems:'center', justifyContent:'center', fontSize:'18px', fontWeight:'bold'}}>
+                            {u.username.charAt(0).toUpperCase()}
+                        </div>
+                        <div style={{flex:1}}>
+                            <div style={{fontWeight:'bold', color:'#1e293b', fontSize:'16px'}}>{u.username} {u.id === currentUser.id && '(Moi)'}</div>
+                            <div style={{color: u.role==='admin'?'#ef4444':'#64748b', fontSize:'12px', textTransform:'uppercase', fontWeight:'bold'}}>{u.role==='admin'?'🛡️ Administrateur':'👤 Collaborateur'}</div>
+                            <div style={{fontSize:'12px', color:'#94a3b8'}}>{u.email}</div>
+                        </div>
+                        
+                        {/* BOUTON SUPPRIMER (Admin seulement, et pas soi-même) */}
+                        {currentUser.role === 'admin' && u.id !== currentUser.id && (
+                            <button onClick={() => { if(confirm("Supprimer "+u.username+" ?")) onDeleteUser(u.id); }} style={{background:'transparent', border:'none', cursor:'pointer', fontSize:'16px', opacity:0.5, padding:'5px'}}>
+                                🗑️
+                            </button>
+                        )}
                     </div>
                 ))}
             </div>
@@ -23,6 +79,9 @@ function MembersView({ users }) {
     );
 }
 
+// ==========================================
+// COMPOSANT 2 : DASHBOARD
+// ==========================================
 function Dashboard({ projects, tasks, user, onOpenProject }) {
     if (user.role === 'admin') {
         const tasksUrgent = tasks.filter(t => t.priority === 'high' && t.status !== 'done' && !t.deleted_at);
@@ -52,6 +111,9 @@ function Dashboard({ projects, tasks, user, onOpenProject }) {
     );
 }
 
+// ==========================================
+// COMPOSANT 3 : VUE PROJET
+// ==========================================
 function ProjectView({ project, tasks, allUsers, viewMode, setViewMode, onAddTask, onEditTask, onUpdateTask, onDeleteProject, user }) {
     const [newTask, setNewTask] = useState("");
     const getSortedTasks = (taskList) => [...taskList].sort((a, b) => (( {high:3,normal:2,low:1}[b.priority]||2) - ({high:3,normal:2,low:1}[a.priority]||2)));
@@ -78,7 +140,7 @@ function ProjectView({ project, tasks, allUsers, viewMode, setViewMode, onAddTas
 }
 
 // ==========================================
-// SIDEBAR (AVEC RENOMMAGE PROJETS)
+// COMPOSANT 4 : SIDEBAR
 // ==========================================
 function Sidebar({ sites, projects, activeProject, setActiveProject, onLogout, onCreateProject, onUpdateProject, onCreateSite, onUpdateSite, onDeleteSite, user, setPage }) {
     const [expandedSites, setExpandedSites] = useState({});
@@ -116,7 +178,6 @@ function Sidebar({ sites, projects, activeProject, setActiveProject, onLogout, o
                                 {projects.filter(p=>p.site_id===site.id).map(p=>(
                                     <div key={p.id} style={{display:'flex', justifyContent:'space-between', alignItems:'center', paddingRight:'10px', marginBottom:'2px', cursor:'pointer', background:activeProject===p.id?'rgba(59, 130, 246, 0.1)':'transparent', borderRadius:'4px'}}>
                                         <div onClick={()=>{setActiveProject(p.id); setPage('project');}} style={{padding:'8px', color:activeProject===p.id?'#60a5fa':'#cbd5e1', fontSize:'13px', flex:1}}>{p.name}</div>
-                                        {/* CRAYON RENOMMER PROJET */}
                                         {user.role==='admin' && <span onClick={()=>{const n=prompt("Renommer le projet ?", p.name); if(n) onUpdateProject(p.id, n);}} style={{fontSize:'10px', color:'#64748b', cursor:'pointer', opacity:0.6}}>✏️</span>}
                                     </div>
                                 ))}
@@ -170,7 +231,7 @@ function App() {
                 />
             </div>
             <div style={{flex:1, overflowY:'auto', background:'#f8fafc'}}>
-                {currentPage==='members' && <MembersView users={allUsers}/>}
+                {currentPage==='members' && <MembersView users={allUsers} currentUser={user} onAddUser={async(u)=>{await fetch(`${API_BASE}/users`,{method:'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify(u)}); fetchData();}} onDeleteUser={async(id)=>{await fetch(`${API_BASE}/users/${id}`,{method:'DELETE'}); fetchData();}} />}
                 {currentPage==='dashboard' && <Dashboard projects={projects} tasks={tasks} user={user} onOpenProject={(id)=>{setActiveProject(id); setCurrentPage('project');}} />}
                 {currentPage==='project' && activeProject && <ProjectView project={activeProjectData} tasks={activeProjectTasks} allUsers={allUsers} user={user} viewMode={viewMode} setViewMode={setViewMode} 
                     onAddTask={async(t)=>{await fetch(`${API_BASE}/tasks`,{method:'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify({project_id:activeProject,title:t,status:'todo',priority:'normal',assignee_id:user.id})}); fetchData();}} 

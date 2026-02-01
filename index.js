@@ -37,7 +37,28 @@ app.post("/login", async (req, res) => {
 app.get("/sites", async (req, res) => { try { res.json((await pool.query("SELECT * FROM sites ORDER BY id")).rows); } catch(e) { res.status(500).send(e); } });
 app.get("/projects", async (req, res) => { try { res.json((await pool.query("SELECT * FROM projects ORDER BY id")).rows); } catch(e) { res.status(500).send(e); } });
 app.get("/tasks", async (req, res) => { try { res.json((await pool.query("SELECT * FROM tasks ORDER BY id")).rows); } catch(e) { res.status(500).send(e); } });
-app.get("/users", async (req, res) => { try { res.json((await pool.query("SELECT id, username, email, role FROM users")).rows); } catch(e) { res.status(500).send(e); } });
+app.get("/users", async (req, res) => { try { res.json((await pool.query("SELECT id, username, email, role FROM users ORDER BY id")).rows); } catch(e) { res.status(500).send(e); } });
+
+// GESTION UTILISATEURS (NOUVEAU !)
+app.post("/users", async (req, res) => {
+    const { username, email, password, role } = req.body;
+    try {
+        // On crypte le mot de passe avant de l'enregistrer
+        const hash = await bcrypt.hash(password, 10);
+        await pool.query("INSERT INTO users (username, email, password_hash, role) VALUES ($1, $2, $3, $4)", [username, email, hash, role]);
+        res.sendStatus(201);
+    } catch(e) { console.error(e); res.status(500).send("Erreur création utilisateur (Email déjà pris ?)"); }
+});
+
+app.delete("/users/:id", async (req, res) => {
+    try {
+        // 1. On désassigne les tâches de cet utilisateur (elles deviennent "sans porteur")
+        await pool.query("UPDATE tasks SET assignee_id = NULL WHERE assignee_id = $1", [req.params.id]);
+        // 2. On supprime l'utilisateur
+        await pool.query("DELETE FROM users WHERE id = $1", [req.params.id]);
+        res.sendStatus(200);
+    } catch(e) { res.status(500).send(e); }
+});
 
 // SITES
 app.post("/sites", async (req, res) => { try { await pool.query("INSERT INTO sites (name) VALUES ($1)", [req.body.name]); res.sendStatus(201); } catch(e) { res.status(500).send(e); } });
@@ -55,12 +76,9 @@ app.delete("/sites/:id", async (req, res) => {
     } catch (e) { res.status(500).send(e); }
 });
 
-// PROJETS (Avec Renommage !)
+// PROJETS
 app.post("/projects", async (req, res) => { try { await pool.query("INSERT INTO projects (site_id, name, owner_id) VALUES ($1, $2, $3)", [req.body.site_id, req.body.name, req.body.owner_id]); res.sendStatus(201); } catch(e) { res.status(500).send(e); } });
-app.put("/projects/:id", async (req, res) => { 
-    // 🔥 C'EST ICI QUE CA SE PASSE
-    try { await pool.query("UPDATE projects SET name = $1 WHERE id = $2", [req.body.name, req.params.id]); res.sendStatus(200); } catch(e) { res.status(500).send(e); } 
-});
+app.put("/projects/:id", async (req, res) => { try { await pool.query("UPDATE projects SET name = $1 WHERE id = $2", [req.body.name, req.params.id]); res.sendStatus(200); } catch(e) { res.status(500).send(e); } });
 app.delete("/projects/:id", async (req, res) => { try { await pool.query("DELETE FROM tasks WHERE project_id = $1", [req.params.id]); await pool.query("DELETE FROM projects WHERE id = $1", [req.params.id]); res.sendStatus(200); } catch (e) { res.status(500).send(e); } });
 
 // TÂCHES
