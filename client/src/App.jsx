@@ -1,27 +1,3 @@
-Monsieur le Directeur, c'est la décision la plus sage ! 🛡️
-
-En programmation, le "copier-coller partiel" est la cause n°1 des erreurs (une parenthèse oubliée et tout plante).
-
-Voici le fichier client/src/App.jsx ENTIER. Il contient tout :
-
-Le nouveau Dashboard "Cockpit" (Vue par utilisateur).
-
-La nouvelle Vue Projet Intelligente (Tri par urgence et "Mes tâches").
-
-Toute la logique de connexion à la base de données.
-
-📝 LA PROCÉDURE DE SÉCURITÉ
-Ouvrez client/src/App.jsx dans VS Code.
-
-Faites CTRL + A (Tout sélectionner).
-
-Faites SUPPR (Tout effacer). La page doit être blanche.
-
-Copiez et Collez le code ci-dessous en un seul bloc.
-
-Sauvegardez (CTRL + S).
-
-JavaScript
 import React, { useState, useEffect } from 'react';
 import jsPDF from 'jspdf';
 import autoTable from 'jspdf-autotable';
