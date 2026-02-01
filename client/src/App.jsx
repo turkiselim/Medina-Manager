@@ -4,12 +4,9 @@ import autoTable from 'jspdf-autotable';
 
 const API_BASE = "https://medina-api.onrender.com"; 
 
-// ... (Gardez les composants MembersView, Dashboard, Sidebar, ProjectView identiques à la V10)
-// POUR GAGNER DU TEMPS, JE NE REMETS QUE LE COMPOSANT MODIFIÉ ET L'APP PRINCIPALE CI-DESSOUS
-// MAIS VOUS DEVEZ COPIER TOUT LE FICHIER COMPLET.
-
-// COPIEZ-COLLEZ CE QUI SUIT DANS VOTRE FICHIER EN ENTIER (J'ai inclus tout le code pour éviter les erreurs) :
-
+// ==========================================
+// COMPOSANT 1 : GESTION ÉQUIPE
+// ==========================================
 function MembersView({ users, currentUser, onAddUser, onDeleteUser }) {
     const [isAdding, setIsAdding] = useState(false);
     const [newUser, setNewUser] = useState({ username: '', email: '', password: '', role: 'user' });
@@ -23,16 +20,29 @@ function MembersView({ users, currentUser, onAddUser, onDeleteUser }) {
     );
 }
 
+// ==========================================
+// COMPOSANT 2 : DASHBOARD (Avec Scroll Widget)
+// ==========================================
 function Dashboard({ projects, tasks, user, onOpenProject, allUsers }) {
+    const scrollToTasks = () => {
+        const el = document.getElementById('task-list-section');
+        if(el) el.scrollIntoView({ behavior: 'smooth' });
+    };
+
     if (user.role === 'admin') {
         const tasksUrgent = tasks.filter(t => t.priority === 'high' && t.status !== 'done' && !t.deleted_at);
         const totalTasks = tasks.filter(t => !t.deleted_at).length;
         const tasksDone = tasks.filter(t => t.status === 'done' && !t.deleted_at).length;
         const globalProgress = totalTasks === 0 ? 0 : Math.round((tasksDone / totalTasks) * 100);
+
         return (
             <div style={{padding:'40px', background:'#f8fafc', minHeight:'100vh'}}>
                 <h1 style={{fontSize:'26px', color:'#1e293b'}}>🏰 Tour de Contrôle</h1><p style={{color:'#64748b', marginBottom:'30px'}}>Vue d'ensemble.</p>
-                <div style={{display:'grid', gridTemplateColumns:'repeat(auto-fit, minmax(220px, 1fr))', gap:'20px', marginBottom:'30px'}}><div style={{background:'white', padding:'25px', borderRadius:'16px', borderLeft:'6px solid #2563eb', boxShadow:'0 4px 6px -1px rgba(0, 0, 0, 0.05)'}}><div style={{fontSize:'12px', color:'#64748b', fontWeight:'700'}}>PROJETS ACTIFS</div><div style={{fontSize:'32px', fontWeight:'800', color:'#1e293b'}}>{projects.length}</div></div><div style={{background:'white', padding:'25px', borderRadius:'16px', borderLeft:'6px solid #ef4444', boxShadow:'0 4px 6px -1px rgba(0, 0, 0, 0.05)'}}><div style={{fontSize:'12px', color:'#64748b', fontWeight:'700'}}>URGENCES</div><div style={{fontSize:'32px', fontWeight:'800', color:'#ef4444'}}>{tasksUrgent.length}</div></div><div style={{background:'white', padding:'25px', borderRadius:'16px', borderLeft:'6px solid #10b981', boxShadow:'0 4px 6px -1px rgba(0, 0, 0, 0.05)'}}><div style={{fontSize:'12px', color:'#64748b', fontWeight:'700'}}>AVANCEMENT</div><div style={{fontSize:'32px', fontWeight:'800', color:'#10b981'}}>{globalProgress}%</div><div style={{height:'6px', background:'#e2e8f0', borderRadius:'3px', marginTop:'10px'}}><div style={{width:`${globalProgress}%`, height:'100%', background:'#10b981', borderRadius:'3px'}}></div></div></div></div>
+                <div style={{display:'grid', gridTemplateColumns:'repeat(auto-fit, minmax(220px, 1fr))', gap:'20px', marginBottom:'30px'}}>
+                    <div style={{background:'white', padding:'25px', borderRadius:'16px', borderLeft:'6px solid #2563eb', boxShadow:'0 4px 6px -1px rgba(0, 0, 0, 0.05)'}}><div style={{fontSize:'12px', color:'#64748b', fontWeight:'700'}}>PROJETS ACTIFS</div><div style={{fontSize:'32px', fontWeight:'800', color:'#1e293b'}}>{projects.length}</div></div>
+                    <div style={{background:'white', padding:'25px', borderRadius:'16px', borderLeft:'6px solid #ef4444', boxShadow:'0 4px 6px -1px rgba(0, 0, 0, 0.05)'}}><div style={{fontSize:'12px', color:'#64748b', fontWeight:'700'}}>URGENCES</div><div style={{fontSize:'32px', fontWeight:'800', color:'#ef4444'}}>{tasksUrgent.length}</div></div>
+                    <div style={{background:'white', padding:'25px', borderRadius:'16px', borderLeft:'6px solid #10b981', boxShadow:'0 4px 6px -1px rgba(0, 0, 0, 0.05)'}}><div style={{fontSize:'12px', color:'#64748b', fontWeight:'700'}}>AVANCEMENT</div><div style={{fontSize:'32px', fontWeight:'800', color:'#10b981'}}>{globalProgress}%</div><div style={{height:'6px', background:'#e2e8f0', borderRadius:'3px', marginTop:'10px'}}><div style={{width:`${globalProgress}%`, height:'100%', background:'#10b981', borderRadius:'3px'}}></div></div></div>
+                </div>
                 <div style={{display:'grid', gridTemplateColumns:'repeat(auto-fit, minmax(300px, 1fr))', gap:'30px'}}><div><h3 style={{fontSize:'18px', fontWeight:'700', color:'#334155'}}>🔥 Alertes</h3><div style={{background:'white', borderRadius:'16px', border:'1px solid #f1f5f9', overflow:'hidden', marginTop:'15px'}}>{tasksUrgent.length === 0 ? <div style={{padding:'20px', textAlign:'center', color:'#94a3b8'}}>Aucune urgence.</div> : tasksUrgent.map(t => <div key={t.id} onClick={()=>onOpenProject(t.project_id)} style={{padding:'15px', borderBottom:'1px solid #f1f5f9', cursor:'pointer', display:'flex', justifyContent:'space-between'}}><span>⚠️ {t.title}</span><span style={{fontSize:'12px', color:'#ef4444'}}>Projet #{t.project_id}</span></div>)}</div></div><div><h3 style={{fontSize:'18px', fontWeight:'700', color:'#334155'}}>👥 Charge</h3><div style={{background:'white', borderRadius:'16px', border:'1px solid #f1f5f9', padding:'20px', marginTop:'15px'}}>{allUsers.map(u => {const userTasks = tasks.filter(t => t.assignee_id === u.id && t.status !== 'done' && !t.deleted_at).length; const loadColor = userTasks > 5 ? '#ef4444' : (userTasks > 2 ? '#facc15' : '#10b981'); return (<div key={u.id} style={{marginBottom:'15px'}}><div style={{display:'flex', justifyContent:'space-between', fontSize:'14px', marginBottom:'5px', fontWeight:'600', color:'#334155'}}><span>{u.username}</span><span>{userTasks} tâches</span></div><div style={{height:'6px', background:'#f1f5f9', borderRadius:'3px'}}><div style={{width:`${Math.min(userTasks*15, 100)}%`, height:'100%', background:loadColor, borderRadius:'3px'}}></div></div></div>)})}</div></div></div>
             </div>
         );
@@ -42,13 +52,19 @@ function Dashboard({ projects, tasks, user, onOpenProject, allUsers }) {
     return (
         <div style={{padding:'40px', background:'#f8fafc', minHeight:'100vh'}}>
             <h1 style={{fontSize:'24px', color:'#1e293b'}}>Bonjour, {user.username} 👋</h1>
-            <div style={{display:'grid', gridTemplateColumns:'repeat(2, 1fr)', gap:'20px', marginTop:'20px'}}><div style={{background:'white', padding:'20px', borderRadius:'16px', boxShadow:'0 2px 5px rgba(0,0,0,0.05)'}}><div style={{fontSize:'28px', fontWeight:'bold', color:'#3b82f6'}}>{myTasks.length}</div><div style={{fontSize:'12px', color:'#64748b', fontWeight:'bold'}}>À FAIRE</div></div><div style={{background:'white', padding:'20px', borderRadius:'16px', boxShadow:'0 2px 5px rgba(0,0,0,0.05)'}}><div style={{fontSize:'28px', fontWeight:'bold', color:'#10b981'}}>{myProgress}%</div><div style={{fontSize:'12px', color:'#64748b', fontWeight:'bold', marginBottom:'5px'}}>EFFICACITÉ</div><div style={{height:'6px', background:'#f1f5f9', borderRadius:'3px'}}><div style={{width:`${myProgress}%`, height:'100%', background:'#10b981', borderRadius:'3px'}}></div></div></div></div>
-            <h3 style={{fontSize:'18px', fontWeight:'700', color:'#334155', marginTop:'30px'}}>🎯 Mes Tâches</h3>
+            <div style={{display:'grid', gridTemplateColumns:'repeat(2, 1fr)', gap:'20px', marginTop:'20px'}}>
+                <div onClick={scrollToTasks} style={{background:'white', padding:'20px', borderRadius:'16px', boxShadow:'0 2px 5px rgba(0,0,0,0.05)', cursor:'pointer', border:'1px solid #e2e8f0'}}><div style={{fontSize:'28px', fontWeight:'bold', color:'#3b82f6'}}>{myTasks.length}</div><div style={{fontSize:'12px', color:'#64748b', fontWeight:'bold'}}>À FAIRE (cliquer)</div></div>
+                <div style={{background:'white', padding:'20px', borderRadius:'16px', boxShadow:'0 2px 5px rgba(0,0,0,0.05)'}}><div style={{fontSize:'28px', fontWeight:'bold', color:'#10b981'}}>{myProgress}%</div><div style={{fontSize:'12px', color:'#64748b', fontWeight:'bold', marginBottom:'5px'}}>EFFICACITÉ</div><div style={{height:'6px', background:'#f1f5f9', borderRadius:'3px'}}><div style={{width:`${myProgress}%`, height:'100%', background:'#10b981', borderRadius:'3px'}}></div></div></div>
+            </div>
+            <h3 id="task-list-section" style={{fontSize:'18px', fontWeight:'700', color:'#334155', marginTop:'30px'}}>🎯 Mes Tâches</h3>
             <div style={{background:'white', borderRadius:'16px', marginTop:'15px', boxShadow:'0 4px 6px -1px rgba(0,0,0,0.05)'}}>{myTasks.length===0?<div style={{padding:'40px', textAlign:'center', color:'#94a3b8'}}>Rien à faire !</div>:myTasks.map(t=><div key={t.id} onClick={()=>onOpenProject(t.project_id)} style={{padding:'20px', borderBottom:'1px solid #f1f5f9', cursor:'pointer', display:'flex', justifyContent:'space-between'}}><span>{t.title}</span>{t.priority==='high'&&<span style={{fontSize:'10px',background:'#fee2e2',color:'#ef4444',padding:'2px 6px',borderRadius:'4px'}}>URGENT</span>}</div>)}</div>
         </div>
     );
 }
 
+// ==========================================
+// COMPOSANT 3 : VUE PROJET
+// ==========================================
 function ProjectView({ project, tasks, allUsers, viewMode, setViewMode, onAddTask, onEditTask, onUpdateTask, onDeleteProject, user }) {
     const [newTask, setNewTask] = useState("");
     const getSortedTasks = (taskList) => [...taskList].sort((a, b) => (( {high:3,normal:2,low:1}[b.priority]||2) - ({high:3,normal:2,low:1}[a.priority]||2)));
@@ -66,15 +82,16 @@ function ProjectView({ project, tasks, allUsers, viewMode, setViewMode, onAddTas
 }
 
 // ==========================================
-// 🔥 MODAL AVEC INDICATEUR DE CHARGEMENT
+// 🔥 MODAL RESPONSIVE (CORRECTIF SMARTPHONE)
 // ==========================================
 function EditTaskModal({ task, user, allUsers, onClose, onUpdate, onDelete }) {
     const [editedTask, setEditedTask] = useState(task);
     const [comments, setComments] = useState([]);
     const [newComment, setNewComment] = useState("");
     const [file, setFile] = useState(null);
-    const [isUploading, setIsUploading] = useState(false); // ETAT DE CHARGEMENT
+    const [isUploading, setIsUploading] = useState(false);
     const fileInputRef = useRef(null);
+    const isMobile = window.innerWidth < 768; // Détection mobile
 
     useEffect(() => {
         fetch(`${API_BASE}/comments/${task.id}`, { headers: {'Authorization': user.token} })
@@ -82,66 +99,85 @@ function EditTaskModal({ task, user, allUsers, onClose, onUpdate, onDelete }) {
     }, [task.id]);
 
     const handleSendComment = async (e) => {
-        e.preventDefault();
-        if(!newComment && !file) return;
-        setIsUploading(true); // ON ACTIVE LE CHARGEMENT
-
+        e.preventDefault(); if(!newComment && !file) return; setIsUploading(true);
         let fileData = null; let fileName = null; let fileType = null;
         if (file) {
-            const reader = new FileReader();
-            reader.readAsDataURL(file);
-            reader.onload = async () => {
-                fileData = reader.result; fileName = file.name; fileType = file.type;
-                await postComment(fileData, fileName, fileType);
-            };
-        } else {
-            await postComment(null, null, null);
-        }
+            const reader = new FileReader(); reader.readAsDataURL(file);
+            reader.onload = async () => { fileData = reader.result; fileName = file.name; fileType = file.type; await postComment(fileData, fileName, fileType); };
+        } else { await postComment(null, null, null); }
     };
 
     const postComment = async (fData, fName, fType) => {
         const payload = { task_id: task.id, user_id: user.id, content: newComment, file_data: fData, file_name: fName, file_type: fType };
-        try {
-            await fetch(`${API_BASE}/comments`, { method: 'POST', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify(payload) });
-            const res = await fetch(`${API_BASE}/comments/${task.id}`);
-            setComments(await res.json());
-            setNewComment(""); setFile(null);
-        } catch(err) { alert("Erreur envoi (Fichier trop lourd ?)"); }
-        setIsUploading(false); // ON DESACTIVE LE CHARGEMENT
+        try { await fetch(`${API_BASE}/comments`, { method: 'POST', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify(payload) }); const res = await fetch(`${API_BASE}/comments/${task.id}`); setComments(await res.json()); setNewComment(""); setFile(null); } catch(err) { alert("Erreur envoi"); } setIsUploading(false);
     };
 
     return (
-        <div style={{position:'fixed', top:0, left:0, right:0, bottom:0, background:'rgba(0,0,0,0.5)', zIndex:2000, display:'flex', justifyContent:'center', alignItems:'center', padding:'20px'}}>
-            <div style={{background:'white', width:'100%', maxWidth:'800px', height:'80vh', borderRadius:'16px', display:'flex', overflow:'hidden', boxShadow:'0 25px 50px -12px rgba(0, 0, 0, 0.25)'}}>
-                <div style={{width:'40%', padding:'30px', borderRight:'1px solid #e2e8f0', overflowY:'auto', background:'#f8fafc'}}>
-                    <h3 style={{margin:'0 0 20px 0', color:'#1e293b'}}>Modifier la tâche</h3>
+        <div style={{position:'fixed', top:0, left:0, right:0, bottom:0, background:'rgba(0,0,0,0.5)', zIndex:2000, display:'flex', justifyContent:'center', alignItems:'center', padding: isMobile ? '0' : '20px'}}>
+            <div style={{
+                background:'white', 
+                width: isMobile ? '100%' : '800px', 
+                height: isMobile ? '100%' : '80vh', 
+                borderRadius: isMobile ? '0' : '16px', 
+                display:'flex', 
+                flexDirection: isMobile ? 'column' : 'row', // 🔥 COLONNE SUR MOBILE
+                overflow:'hidden', 
+                boxShadow:'0 25px 50px -12px rgba(0, 0, 0, 0.25)'
+            }}>
+                
+                {/* PARTIE 1 : DÉTAILS (Haut sur mobile, Gauche sur PC) */}
+                <div style={{
+                    width: isMobile ? '100%' : '40%', 
+                    padding: isMobile ? '20px' : '30px', 
+                    borderRight: isMobile ? 'none' : '1px solid #e2e8f0', 
+                    borderBottom: isMobile ? '1px solid #e2e8f0' : 'none',
+                    overflowY:'auto', 
+                    background:'#f8fafc',
+                    maxHeight: isMobile ? '50vh' : '100%' // Limite la hauteur sur mobile
+                }}>
+                    <div style={{display:'flex', justifyContent:'space-between', alignItems:'center', marginBottom:'20px'}}>
+                        <h3 style={{margin:0, color:'#1e293b'}}>Modifier</h3>
+                        {isMobile && <button onClick={onClose} style={{background:'#e2e8f0', border:'none', borderRadius:'50%', width:'30px', height:'30px', fontWeight:'bold'}}>✕</button>}
+                    </div>
+                    
                     <input value={editedTask.title} onChange={e=>setEditedTask({...editedTask, title:e.target.value})} style={{width:'100%', padding:'12px', border:'1px solid #cbd5e1', borderRadius:'8px', fontSize:'15px', marginBottom:'20px'}} />
-                    <label style={{fontSize:'12px', fontWeight:'bold', color:'#64748b'}}>STATUT</label><select value={editedTask.status} onChange={e=>setEditedTask({...editedTask, status:e.target.value})} style={{width:'100%', padding:'10px', borderRadius:'8px', border:'1px solid #cbd5e1', marginBottom:'15px', background:'white'}}><option value="todo">À faire</option><option value="doing">En cours</option><option value="done">Terminé</option></select>
-                    <label style={{fontSize:'12px', fontWeight:'bold', color:'#64748b'}}>PRIORITÉ</label><select value={editedTask.priority} onChange={e=>setEditedTask({...editedTask, priority:e.target.value})} style={{width:'100%', padding:'10px', borderRadius:'8px', border:'1px solid #cbd5e1', marginBottom:'15px', background:'white'}}><option value="low">Basse</option><option value="normal">Normale</option><option value="high">Haute 🔥</option></select>
-                    {user.role === 'admin' && <><label style={{fontSize:'12px', fontWeight:'bold', color:'#64748b'}}>RESPONSABLE</label><select value={editedTask.assignee_id || ''} onChange={e=>setEditedTask({...editedTask, assignee_id:parseInt(e.target.value)})} style={{width:'100%', padding:'10px', borderRadius:'8px', border:'1px solid #cbd5e1', marginBottom:'15px', background:'white'}}><option value="">-- Personne --</option>{allUsers.map(u => <option key={u.id} value={u.id}>{u.username}</option>)}</select></>}
-                    <label style={{fontSize:'12px', fontWeight:'bold', color:'#64748b'}}>ÉCHÉANCE</label><input type="date" value={editedTask.due_date ? editedTask.due_date.split('T')[0] : ''} onChange={e=>setEditedTask({...editedTask, due_date:e.target.value})} style={{width:'100%', padding:'10px', border:'1px solid #cbd5e1', borderRadius:'8px', background:'white', marginBottom:'30px'}} />
-                    <div style={{display:'flex', flexDirection:'column', gap:'10px'}}><button onClick={()=>onUpdate(editedTask)} style={{padding:'12px', background:'#2563eb', color:'white', border:'none', borderRadius:'8px', cursor:'pointer', fontWeight:'bold'}}>Enregistrer</button><div style={{display:'flex', justifyContent:'space-between'}}><button onClick={onClose} style={{padding:'10px', border:'none', background:'transparent', color:'#64748b', cursor:'pointer'}}>Fermer</button><button onClick={onDelete} style={{color:'#ef4444', background:'none', border:'none', cursor:'pointer', fontSize:'12px'}}>Supprimer</button></div></div>
+                    <div style={{display: 'grid', gridTemplateColumns: '1fr 1fr', gap: '10px'}}>
+                        <div><label style={{fontSize:'12px', fontWeight:'bold', color:'#64748b'}}>STATUT</label><select value={editedTask.status} onChange={e=>setEditedTask({...editedTask, status:e.target.value})} style={{width:'100%', padding:'10px', borderRadius:'8px', border:'1px solid #cbd5e1', background:'white'}}><option value="todo">À faire</option><option value="doing">En cours</option><option value="done">Terminé</option></select></div>
+                        <div><label style={{fontSize:'12px', fontWeight:'bold', color:'#64748b'}}>PRIORITÉ</label><select value={editedTask.priority} onChange={e=>setEditedTask({...editedTask, priority:e.target.value})} style={{width:'100%', padding:'10px', borderRadius:'8px', border:'1px solid #cbd5e1', background:'white'}}><option value="low">Basse</option><option value="normal">Normale</option><option value="high">Haute 🔥</option></select></div>
+                    </div>
+                    {user.role === 'admin' && <div style={{marginTop:'15px'}}><label style={{fontSize:'12px', fontWeight:'bold', color:'#64748b'}}>RESPONSABLE</label><select value={editedTask.assignee_id || ''} onChange={e=>setEditedTask({...editedTask, assignee_id:parseInt(e.target.value)})} style={{width:'100%', padding:'10px', borderRadius:'8px', border:'1px solid #cbd5e1', background:'white'}}><option value="">-- Personne --</option>{allUsers.map(u => <option key={u.id} value={u.id}>{u.username}</option>)}</select></div>}
+                    <div style={{marginTop:'15px'}}><label style={{fontSize:'12px', fontWeight:'bold', color:'#64748b'}}>ÉCHÉANCE</label><input type="date" value={editedTask.due_date ? editedTask.due_date.split('T')[0] : ''} onChange={e=>setEditedTask({...editedTask, due_date:e.target.value})} style={{width:'100%', padding:'10px', border:'1px solid #cbd5e1', borderRadius:'8px', background:'white', marginBottom:'30px'}} /></div>
+                    
+                    <div style={{display:'flex', flexDirection:'column', gap:'10px'}}>
+                        <button onClick={()=>onUpdate(editedTask)} style={{padding:'12px', background:'#2563eb', color:'white', border:'none', borderRadius:'8px', cursor:'pointer', fontWeight:'bold'}}>Enregistrer</button>
+                        <div style={{display:'flex', justifyContent:'space-between'}}>
+                             {!isMobile && <button onClick={onClose} style={{padding:'10px', border:'none', background:'transparent', color:'#64748b', cursor:'pointer'}}>Fermer</button>}
+                             <button onClick={onDelete} style={{color:'#ef4444', background:'none', border:'none', cursor:'pointer', fontSize:'12px'}}>Supprimer</button>
+                        </div>
+                    </div>
                 </div>
-                <div style={{flex:1, display:'flex', flexDirection:'column', background:'white'}}>
-                    <div style={{padding:'20px', borderBottom:'1px solid #e2e8f0', fontWeight:'bold', color:'#334155'}}>💬 Commentaires & Fichiers</div>
-                    <div style={{flex:1, overflowY:'auto', padding:'20px', display:'flex', flexDirection:'column', gap:'15px'}}>
-                        {comments.length === 0 && <div style={{color:'#cbd5e1', textAlign:'center', marginTop:'50px'}}>Aucun message pour l'instant.</div>}
+
+                {/* PARTIE 2 : CHAT (Bas sur mobile, Droite sur PC) */}
+                <div style={{flex:1, display:'flex', flexDirection:'column', background:'white', height: isMobile ? '50vh' : '100%'}}>
+                    <div style={{padding:'15px', borderBottom:'1px solid #e2e8f0', fontWeight:'bold', color:'#334155', fontSize:'14px'}}>💬 Commentaires</div>
+                    <div style={{flex:1, overflowY:'auto', padding:'15px', display:'flex', flexDirection:'column', gap:'15px'}}>
+                        {comments.length === 0 && <div style={{color:'#cbd5e1', textAlign:'center', marginTop:'20px'}}>Aucun message.</div>}
                         {comments.map(c => (
                             <div key={c.id} style={{display:'flex', gap:'10px', alignItems:'flex-start'}}>
-                                <div style={{width:'30px', height:'30px', borderRadius:'50%', background:'#e2e8f0', display:'flex', alignItems:'center', justifyContent:'center', fontSize:'12px', fontWeight:'bold', color:'#64748b'}}>{c.username.charAt(0)}</div>
-                                <div><div style={{fontSize:'12px', color:'#94a3b8', marginBottom:'2px'}}><b>{c.username}</b> • {new Date(c.created_at).toLocaleString()}</div><div style={{background:'#f1f5f9', padding:'10px', borderRadius:'0 10px 10px 10px', color:'#334155', fontSize:'14px'}}>{c.content}{c.file_data && (<div style={{marginTop:'10px'}}>{c.file_type.startsWith('image/') ? (<img src={c.file_data} alt="pj" style={{maxWidth:'100%', borderRadius:'6px', border:'1px solid #e2e8f0'}} />) : (<a href={c.file_data} download={c.file_name} style={{display:'flex', alignItems:'center', gap:'5px', textDecoration:'none', color:'#2563eb', background:'white', padding:'5px 10px', borderRadius:'6px', border:'1px solid #bfdbfe'}}>📎 {c.file_name}</a>)}</div>)}</div></div>
+                                <div style={{width:'25px', height:'25px', borderRadius:'50%', background:'#e2e8f0', display:'flex', alignItems:'center', justifyContent:'center', fontSize:'10px', fontWeight:'bold', color:'#64748b'}}>{c.username.charAt(0)}</div>
+                                <div style={{maxWidth:'85%'}}>
+                                    <div style={{fontSize:'10px', color:'#94a3b8', marginBottom:'2px'}}><b>{c.username}</b></div>
+                                    <div style={{background:'#f1f5f9', padding:'8px', borderRadius:'0 10px 10px 10px', color:'#334155', fontSize:'13px'}}>{c.content}{c.file_data && (<div style={{marginTop:'5px'}}>{c.file_type.startsWith('image/') ? (<img src={c.file_data} alt="pj" style={{maxWidth:'100%', borderRadius:'6px', border:'1px solid #e2e8f0'}} />) : (<a href={c.file_data} download={c.file_name} style={{display:'flex', alignItems:'center', gap:'5px', textDecoration:'none', color:'#2563eb', fontSize:'12px'}}>📎 {c.file_name}</a>)}</div>)}</div>
+                                </div>
                             </div>
                         ))}
                     </div>
-                    <div style={{padding:'20px', borderTop:'1px solid #e2e8f0', background:'#f8fafc'}}>
-                        <form onSubmit={handleSendComment} style={{display:'flex', gap:'10px'}}>
+                    <div style={{padding:'10px', borderTop:'1px solid #e2e8f0', background:'#f8fafc'}}>
+                        <form onSubmit={handleSendComment} style={{display:'flex', gap:'5px'}}>
                             <input type="file" ref={fileInputRef} onChange={e=>setFile(e.target.files[0])} style={{display:'none'}} />
-                            <button type="button" onClick={()=>fileInputRef.current.click()} style={{background:'white', border:'1px solid #cbd5e1', borderRadius:'8px', padding:'0 15px', cursor:'pointer', fontSize:'18px'}} title="Joindre un fichier">📎</button>
-                            <input value={newComment} onChange={e=>setNewComment(e.target.value)} placeholder={file ? `Fichier: ${file.name}` : "Écrire un message..."} style={{flex:1, padding:'12px', borderRadius:'8px', border:'1px solid #cbd5e1'}} />
-                            {/* BOUTON AVEC ETAT DE CHARGEMENT */}
-                            <button type="submit" disabled={isUploading} style={{background: isUploading ? '#cbd5e1' : '#10b981', color:'white', border:'none', borderRadius:'8px', padding:'0 20px', fontWeight:'bold', cursor: isUploading ? 'wait' : 'pointer'}}>
-                                {isUploading ? 'Envoi...' : 'Envoyer'}
-                            </button>
+                            <button type="button" onClick={()=>fileInputRef.current.click()} style={{background:'white', border:'1px solid #cbd5e1', borderRadius:'8px', width:'40px', cursor:'pointer', fontSize:'18px'}} title="Joindre">📎</button>
+                            <input value={newComment} onChange={e=>setNewComment(e.target.value)} placeholder={file ? `File: ${file.name}` : "Message..."} style={{flex:1, padding:'10px', borderRadius:'8px', border:'1px solid #cbd5e1', fontSize:'13px'}} />
+                            <button type="submit" disabled={isUploading} style={{background: isUploading ? '#cbd5e1' : '#10b981', color:'white', border:'none', borderRadius:'8px', padding:'0 15px', fontWeight:'bold', cursor: isUploading ? 'wait' : 'pointer'}}>{isUploading ? '...' : '➤'}</button>
                         </form>
                     </div>
                 </div>
